@@ -104,6 +104,43 @@ public:
 
 	}
 
+	range_t LF(range_t rn, char c){
+
+		assert(rn.second >= rn.first);
+
+		//number of A,C,T,G before start of interval
+		uint64_t start = BWT.rank(rn.first,c);
+
+		//number of A,C,T,G before end of interval (last position of interval included)
+		uint64_t end;
+
+		if(rn.second>rn.first)
+			end	= BWT.rank(rn.second,c);
+		else
+			end = start;
+
+		assert(start <= end);
+
+		if(c=='A') return {F_A + start, F_A+end};
+		if(c=='C') return {F_C + start, F_C+end};
+		if(c=='G') return {F_G + start, F_G+end};
+		if(c=='T') return {F_T + start, F_T+end};
+
+		return {};
+
+	}
+
+	//find range of P with backward search.
+	range_t find(string & P){
+
+		range_t res = {0,n};
+
+		for(uint64_t i = 0;i<P.length();++i) res = LF(res,P[P.length()-i-1]);
+
+		return res;
+
+	}
+
 	char operator[](uint64_t i){
 
 		return BWT[i];

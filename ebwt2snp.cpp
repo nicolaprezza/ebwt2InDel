@@ -377,6 +377,162 @@ pair<string, int> consensus(vector<string> & S){
 
 }
 
+//find most frequent letter
+pair<char,range_t> consensus_letter(p_range pr){
+
+	vector<pair<char,range_t> > freqs;
+
+	freqs.push_back({'A',pr.A});
+	freqs.push_back({'C',pr.C});
+	freqs.push_back({'G',pr.G});
+	freqs.push_back({'T',pr.T});
+
+	sort( freqs.begin( ), freqs.end( ), [ ]( const pair<char,range_t>& lhs, const pair<char,range_t>& rhs )
+	{
+	   return range_length(lhs.second) > range_length(rhs.second);
+	});
+
+	//if(range_length(freqs[0].second) < mcov_out) return {0,{0,0}};
+	if(range_length(freqs[0].second) == 0) return {0,{0,0}};
+
+	return freqs[0];
+
+}
+
+void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx,int len){
+
+	if(len==0) return;
+
+	p_range pr = bwt.LF(R);
+	auto c = consensus_letter(pr);
+
+	if(c.first!=0){
+
+		ctx += c.first;
+		extract_consensus(bwt, c.second, ctx, len-1);
+
+	}
+
+}
+
+//extract k_left characters using backward search
+void extract_context(dna_bwt_t & bwt, range_t range, char c, vector<string> & left_contexts, int len){
+
+	string ctx;
+	ctx += c;
+
+	range_t R = bwt.LF(range,c);
+
+	extract_consensus(bwt, R,ctx,len-1);
+
+	reverse(ctx.begin(), ctx.end());
+
+	if(ctx.size()>=k_left) left_contexts.push_back(ctx);
+
+}
+
+/*
+ * input: bwts and ranges of cluster (right-excluded)
+ *
+ * output: the variants found in the cluster between the two individuals
+ */
+vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t range1, range_t range2){
+
+	vector<variant_t>  out;
+
+	auto counts = vector<vector<unsigned int> >(2,vector<unsigned int>(4,0));
+
+	uint64_t max_lcp_val = 0;//value of max LCP in cluster
+	uint64_t max_lcp_read_idx = 0;//index of read with max LCP in cluster
+	uint64_t max_lcp_read_pos = 0;//position in read where max LCP starts
+
+	for(uint64_t i=range1.first;i<range1.second;++i) counts[0][bwt1[i]]++;
+	for(uint64_t i=range2.first;i<range2.second;++i) counts[1][bwt2[i]]++;
+
+	//compute the lists of frequent characters in indiv 0 and 1
+	vector<unsigned char> frequent_char_0;
+	vector<unsigned char> frequent_char_1;
+
+	for(int c=0;c<4;++c){
+
+		if(counts[0][c] >= mcov_out) frequent_char_0.push_back(int_to_base(c));
+		if(counts[1][c] >= mcov_out) frequent_char_1.push_back(int_to_base(c));
+
+	}
+
+	std::sort(frequent_char_0.begin(), frequent_char_0.end());
+	std::sort(frequent_char_1.begin(), frequent_char_1.end());
+
+	//all variations observed in cluster
+	auto all_chars = frequent_char_0;
+	all_chars.insert(all_chars.begin(), frequent_char_1.begin(), frequent_char_1.end());
+	std::sort( all_chars.begin(), all_chars.end() );
+	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
+
+	//filter: remove clusters that cannot reflect a variation
+	if(	frequent_char_0.size()==0 or // not covered enough
+		frequent_char_1.size()==0 or // not covered enough
+		frequent_char_0.size()>2 or // we require at most 2 alleles per individual
+		frequent_char_1.size()>2 or // we require  at most 2 alleles per individual
+		frequent_char_0 == frequent_char_1 or // same alleles: probably both heterozigous / multiple region (and no variants)
+		all_chars.size() > 3	//4 or more distinct frequent characters in the cluster (probably multiple region)
+	){
+
+		return out;
+
+	}
+
+	//now, for each frequent char in each of the two individuals, find the associated left-context
+
+	vector<string> left_contexts_0;
+	vector<string> left_contexts_1;
+
+	for(auto c : frequent_char_0) extract_context(bwt1, range1, c, left_contexts_0, k_left);
+	for(auto c : frequent_char_1) extract_context(bwt2, range2, c, left_contexts_1, k_left);
+
+	//find right-context
+
+	string right_ctx = "";
+
+	for(auto lctx : left_contexts_0){
+
+		if(right_ctx.size()==0){
+
+			string tmp = string(lctx);
+			RC(tmp);
+			range_t rn = bwt1.find(tmp);
+			extract_consensus(bwt1, rn, right_ctx, k_right);
+
+			if(right_ctx.size() < k_right) right_ctx = "";
+
+		}
+
+	}
+	for(auto lctx : left_contexts_1){
+
+		if(right_ctx.size()==0){
+
+			string tmp = string(lctx);
+			RC(tmp);
+			range_t rn = bwt2.find(tmp);
+			extract_consensus(bwt2, rn, right_ctx, k_right);
+
+			if(right_ctx.size() < k_right) right_ctx = "";
+
+		}
+
+	}
+
+
+	//TODO build variants
+
+
+
+
+	return out;
+
+}
+
 vector<candidate_variant> find_variants(vector<t_GSA> & gsa_cluster){
 
 	vector<candidate_variant>  out;
@@ -1392,8 +1548,8 @@ int main(int argc, char** argv){
 	cout << "Max stack depth = " << max_stack << endl;
 	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
 
-
 	cout << "Phase 4/4: detecting SNPs and indels." << endl;
+
 
 
 }
