@@ -11,6 +11,9 @@
 #include <unistd.h>
 #include <math.h>
 #include <iomanip>
+#include "dna_bwt.hpp"
+#include "dna_string.hpp"
+#include <stack>
 
 using namespace std;
 
@@ -43,8 +46,10 @@ int consensus_reads_def = 20;
 int max_err_def = 2;
 int max_err = 0;
 
-string input;
-uint64_t nr_reads1 = 0;
+string input1;
+string input2;
+
+uint64_t nr_reads1 = 0;//TODO remove
 
 bool bcr = false;
 
@@ -58,6 +63,11 @@ int lcp = 0;
 int da = 0;
 int pos = 0;
 
+int K_def = 16;
+int K = 0;
+
+char TERM = '#';
+
 uint64_t n_clust = 0; //number of clusters
 uint64_t n_bases = 0; //number of bases in clusters
 
@@ -66,10 +76,11 @@ void help(){
 	cout << "clust2snp [options]" << endl <<
 	"Options:" << endl <<
 	"-h          Print this help." << endl <<
-	"-i <arg>    Input fasta file containing the samples' reads (REQUIRED)." << endl <<
-	"-n <arg>    Number of reads in the first sample (REQUIRED)." << endl <<
+	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first individual (REQUIRED)." << endl <<
+	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second individual (REQUIRED)." << endl <<
 	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
 	"-R <arg>    Length of right context, SNP excluded (default: " << k_right_def << ")." << endl <<
+	"-k <arg>    Minimum LCP required in clusters (default: " << K_def << ")" << endl <<
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
 	"-c <arg>    Extract this maximum number of reads per individual to compute consensus of left-context (default: " << consensus_reads_def << ")."<< endl <<
@@ -79,8 +90,10 @@ void help(){
 	"            " << pval_def << "). In any case, the maximum cluster length will not exceed the value specified with -M."<< endl <<
 	"-M <arg>    Maximum cluster length. Read the description of option -p." << endl <<
 	"-x <arg>    Byte size of LCP integers in input EGSA/BCR file (default: " << lcp_def <<  ")." << endl <<
-	"-y <arg>    Byte size of DA integers (read number) in input EGSA/BCR file (default: " << da_def <<  ")." << endl <<
-	"-z <arg>    Byte size of pos integers (position in read) in input EGSA/BCR file (default: " << pos_def <<  ")." << endl << endl <<
+	"-y <arg>    Byte size of DA integers (read number) in input EGSA/BCR file (default: " << da_def <<  ")." << endl <<//TODO remove
+	"-z <arg>    Byte size of pos integers (position in read) in input EGSA/BCR file (default: " << pos_def <<  ")." << endl << //TODO remove
+	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
+
 
 
 	"\nTo run clust2snp, you must first build (1) the Enhanced Generalized Suffix Array of the input sequences" << endl <<
@@ -965,6 +978,186 @@ void statistics(string & clusters_path){
 
 }
 
+void update_DA(sa_leaf L1,sa_leaf L2, vector<bool> & DA, vector<bool> & LCP_threshold, uint64_t & lcp_values, uint64_t & m){
+
+	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
+	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
+	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
+
+	assert(end>start1);
+
+	for(uint64_t i = start1; i<start2; ++i){
+		DA[i] = 0;
+		m++;
+	}
+
+	for(uint64_t i = start2; i<end; ++i){
+		DA[i] = 1;
+		m++;
+	}
+
+	assert(L1.depth==L2.depth);
+
+	for(uint64_t i = start1+1; i<end; ++i){
+
+		LCP_threshold[i] = (L1.depth >= K);
+
+		lcp_values++;
+
+	}
+
+}
+
+void update_DA(sa_leaf L1,sa_leaf L2, vector<bool> & DA, uint64_t & m){
+
+	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
+	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
+	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
+
+	assert(end>start1);
+
+	for(uint64_t i = start1; i<start2; ++i){
+		DA[i] = 0;
+		m++;
+	}
+
+	for(uint64_t i = start2; i<end; ++i){
+		DA[i] = 1;
+		m++;
+	}
+
+	assert(L1.depth==L2.depth);
+
+}
+
+void next_leaves(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_leaf & L1, sa_leaf & L2, vector<pair<sa_leaf, sa_leaf> > & TMP_LEAVES, int & t){
+
+	p_range ext_1 = bwt1.LF(L1.rn);
+	p_range ext_2 = bwt2.LF(L2.rn);
+
+	//push non-empty leaves on stack in decreasing size order
+
+	t = 0;
+	int min_size = 2;
+
+	if(range_length(ext_1.A) + range_length(ext_2.A) >= min_size) TMP_LEAVES[t++] = {{ext_1.A, L1.depth+1},{ext_2.A, L2.depth+1}};
+	if(range_length(ext_1.C) + range_length(ext_2.C) >= min_size) TMP_LEAVES[t++] = {{ext_1.C, L1.depth+1},{ext_2.C, L2.depth+1}};
+	if(range_length(ext_1.G) + range_length(ext_2.G) >= min_size) TMP_LEAVES[t++] = {{ext_1.G, L1.depth+1},{ext_2.G, L2.depth+1}};
+	if(range_length(ext_1.T) + range_length(ext_2.T) >= min_size) TMP_LEAVES[t++] = {{ext_1.T, L1.depth+1},{ext_2.T, L2.depth+1}};
+
+	std::sort( TMP_LEAVES.begin(), TMP_LEAVES.begin()+t, [ ]( const pair<sa_leaf, sa_leaf>& lhs, const pair<sa_leaf, sa_leaf>& rhs )
+	{
+		return leaf_size(lhs) < leaf_size(rhs);
+	});
+
+}
+
+
+void find_leaves(sa_node x1, sa_node x2, vector<bool> & DA, uint64_t & m){
+
+	//find leaves that were ignored in the first pass
+	if(range_length(child_TERM(x1))+range_length(child_TERM(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_TERM(x1),0};
+		sa_leaf L2 = {child_TERM(x2),0};
+
+		update_DA(L1,L2,DA,m);
+
+	}
+
+	if(range_length(child_A(x1))+range_length(child_A(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_A(x1),0};
+		sa_leaf L2 = {child_A(x2),0};
+
+		update_DA(L1,L2,DA,m);
+
+	}
+
+	if(range_length(child_C(x1))+range_length(child_C(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_C(x1),0};
+		sa_leaf L2 = {child_C(x2),0};
+
+		update_DA(L1,L2,DA,m);
+
+	}
+
+	if(range_length(child_G(x1))+range_length(child_G(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_G(x1),0};
+		sa_leaf L2 = {child_G(x2),0};
+
+		update_DA(L1,L2,DA,m);
+
+	}
+
+	if(range_length(child_T(x1))+range_length(child_T(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_T(x1),0};
+		sa_leaf L2 = {child_T(x2),0};
+
+		update_DA(L1,L2,DA,m);
+
+	}
+
+}
+
+void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, vector<pair<sa_node, sa_node> > & TMP_NODES, int & t){
+
+	p_node left_exts1 = bwt1.LF(N1);
+	p_node left_exts2 = bwt2.LF(N2);
+
+	pair<sa_node, sa_node> A = {left_exts1.A, left_exts2.A};
+	pair<sa_node, sa_node> C = {left_exts1.C, left_exts2.C};
+	pair<sa_node, sa_node> G = {left_exts1.G, left_exts2.G};
+	pair<sa_node, sa_node> T = {left_exts1.T, left_exts2.T};
+
+	t = 0;
+
+	if(number_of_children(A) >= 2) TMP_NODES[t++] = A;
+	if(number_of_children(C) >= 2) TMP_NODES[t++] = C;
+	if(number_of_children(G) >= 2) TMP_NODES[t++] = G;
+	if(number_of_children(T) >= 2) TMP_NODES[t++] = T;
+
+	//push right-maximal nodes on stack in decreasing size (i.e. interval length) order
+
+	std::sort( TMP_NODES.begin(), TMP_NODES.begin()+t, [ ]( const pair<sa_node, sa_node>& lhs, const pair<sa_node, sa_node>& rhs )
+	{
+		return node_size(lhs) < node_size(rhs);
+	});
+
+}
+
+void update_lcp_minima(sa_node x, vector<bool> & LCP_minima, uint64_t & n_min){
+
+/*
+ * we have a minima at the beginning of each child of size at least 2 of the input node
+ */
+
+	//x.first_A is the end position (excluded) of terminator.
+
+	if(x.first_G - x.first_C >= 2 and x.first_C > x.first_A){
+		LCP_minima[x.first_C] = true;
+		n_min++;
+	}
+
+	if(x.first_T - x.first_G >= 2 and x.first_G > x.first_A){
+		LCP_minima[x.first_G] = true;
+		n_min++;
+	}
+
+	if(x.last - x.first_T >= 2 and x.first_T > x.first_A){
+		LCP_minima[x.first_T] = true;
+		n_min++;
+	}
+
+}
 
 int main(int argc, char** argv){
 
@@ -973,7 +1166,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "hi:n:p:v:L:R:m:g:c:x:y:z:e:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:p:v:L:R:m:g:c:x:y:z:e:k:t:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -981,14 +1174,17 @@ int main(int argc, char** argv){
 			case 'b':
 				bcr = true;
 			break;
-			case 'i':
-				input = string(optarg);
+			case '1':
+				input1 = string(optarg);
 			break;
-			case 'n':
-				nr_reads1 = atoi(optarg);
+			case '2':
+				input2 = string(optarg);
 			break;
 			case 'm':
 				mcov_out = atoi(optarg);
+			break;
+			case 'k':
+				K = atoi(optarg);
 			break;
 			case 'g':
 				max_gap = atoi(optarg);
@@ -1017,6 +1213,9 @@ int main(int argc, char** argv){
 			case 'x':
 				lcp = atoi(optarg);
 			break;
+			case 't':
+				TERM = atoi(optarg);
+			break;
 			case 'y':
 				da = atoi(optarg);
 			break;
@@ -1029,6 +1228,7 @@ int main(int argc, char** argv){
 		}
 	}
 
+	K = K == 0 ? K_def : K;
 	lcp = lcp==0?lcp_def:lcp;
 	da = da==0?da_def:da;
 	pos = pos==0?pos_def:pos;
@@ -1042,44 +1242,158 @@ int main(int argc, char** argv){
 	max_snvs = max_snvs==0?max_snvs_def:max_snvs;
 	mcov_out = mcov_out==0?mcov_out_def:mcov_out;
 
-	if(input.compare("")==0 or nr_reads1 == 0) help();
+	if(input1.compare("")==0 or input2.compare("")==0) help();
 
-	egsa_stream EGSA(input);
-	EGSA.set_bytesizes(lcp,da,pos);
+	cout << "This is clust2snp, version 2." << endl <<
+			"Input eBWT files : " << input1 << " and " << input2 << endl <<
+			"Left-extending eBWT ranges by " << k_left << " bases." << endl <<
+			"Right context length: " << k_right << " bases." << endl << endl;
 
-	cout << "This is clust2snp." << endl <<
-			"Input file: " << input << endl <<
-			//"p-value : " << pval << endl <<
-			"Left-extending GSA ranges by " << k_left << " bases." << endl <<
-			"Right context length: at most " << k_right << " bases." << endl;
+	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
 
-	string clusters_path = input;
-	clusters_path.append(".clusters");
+	dna_bwt_t bwt1 = dna_bwt_t(input1,TERM);
+	dna_bwt_t bwt2 = dna_bwt_t(input2,TERM);
+
+	cout << "done." << endl;
+
+	uint64_t n1 = bwt1.size();
+	uint64_t n2 = bwt2.size();
+	uint64_t n = n1+n2;
+
+	cout << "\nPhase 2/4: merging eBWTs." << endl;
+
+	vector<bool> DA = vector<bool>(n,false); //document array
+	vector<bool> LCP_threshold = vector<bool>(n,false);//1 where LCP >= K
+
+	uint64_t da_values = 0;//number computed DA values
+	uint64_t leaves = 0;//number of visited leaves
+	uint64_t max_stack = 0;
+	uint64_t lcp_values = 1;//number of computed LCP values
 
 	{
 
-		ifstream ifs(clusters_path);
+		auto TMP_LEAVES = vector<pair<sa_leaf, sa_leaf> >(5);
 
-		if(not ifs.good()){
+		stack<pair<sa_leaf, sa_leaf> > S;
+		S.push({bwt1.first_leaf(), bwt2.first_leaf()});
 
-			cout << "\nERROR: Could not find BWT clusters file \"" << clusters_path << "\"" << endl << endl;
-			help();
+		int last_perc_lcp = -1;
+		int last_perc_da = -1;
+		int perc_lcp = 0;
+		int perc_da = 0;
+
+		while(not S.empty()){
+
+			pair<sa_leaf, sa_leaf> L = S.top();
+			S.pop();
+			leaves++;
+
+			assert(leaf_size(L)>0);
+			max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+			sa_leaf L1 = L.first;
+			sa_leaf L2 = L.second;
+
+			update_DA(L1, L2, DA, LCP_threshold, lcp_values, da_values);
+
+			//insert leaf in stack iff size(L1) + size(L2) >= min_size
+			//optimization: if we are computing LCP and if size(L1) + size(L2) = 1,
+			//then we will find that leaf during the internal nodes traversal (no need to visit leaf here)
+			int t = 0;//number of children leaves
+			next_leaves(bwt1, bwt2, L1, L2, TMP_LEAVES, t);
+			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
+
+			perc_lcp = (100*lcp_values)/n;
+			perc_da = (100*da_values)/n;
+
+			if(perc_da > last_perc_da){
+
+				cout << "DA: " << perc_da << "%. ";
+				cout << "LCP: " << perc_lcp << "%.";
+				cout << endl;
+
+				last_perc_lcp = perc_lcp;
+				last_perc_da = perc_da;
+
+			}
+
+		}
+	}
+
+	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
+	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
+
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
+
+	cout << "Phase 3/4: computing LCP minima." << endl;
+
+	vector<bool> LCP_minima = vector<bool>(n,false);
+
+	auto TMP_NODES = vector<pair<sa_node, sa_node> >(4);
+
+	uint64_t nodes = 0;//visited ST nodes
+	max_stack = 0;
+
+	stack<pair<sa_node, sa_node> > S;
+	S.push({bwt1.root(), bwt2.root()});
+
+	int last_perc_lcp = -1;
+	int perc_lcp = 0;
+	int last_perc_da = -1;
+	int perc_da = 0;
+	uint64_t n_min = 0;//number of LCP minima
+
+	while(not S.empty()){
+
+		max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+		pair<sa_node, sa_node> N = S.top();
+		S.pop();
+		nodes++;
+
+		sa_node N1 = N.first;
+		sa_node N2 = N.second;
+		sa_node merged = merge_nodes(N1, N2);
+
+		//find leaves in the children of N1 and N2 that were
+		//skipped in the first pass, and update DA accordingly
+		find_leaves(N1, N2, DA, da_values);
+
+		//compute LCP values at the borders of merged's children
+		update_lcp_threshold(merged, LCP_threshold, lcp_values, K);
+
+		update_lcp_minima(merged, LCP_minima, n_min);
+
+		//follow Weiner links
+		int t = 0;
+		next_nodes(bwt1, bwt2, N1, N2, TMP_NODES, t);
+		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
+
+		perc_lcp = (100*lcp_values)/n;
+		perc_da = (100*da_values)/n;
+
+		if(perc_da > last_perc_da){
+
+			cout << "DA: " << perc_da << "%. ";
+			cout << "LCP: " << perc_lcp << "%.";
+			cout << endl;
+
+			last_perc_lcp = perc_lcp;
+			last_perc_da = perc_da;
 
 		}
 
-		ifs.close();
-
 	}
 
-	string filename_out = input;
-	filename_out = filename_out.substr(0,filename_out.rfind(".fast"));
-	filename_out.append(".snp");
+	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
+	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
+	cout << "Found " << n_min << " LCP minima." << endl;
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
 
-	cout << "Output events will be stored in " << filename_out << endl;
 
-	statistics(clusters_path);
-	find_events(EGSA, clusters_path, input, filename_out);
+	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
-	cout << "Done. " <<endl;
 
 }

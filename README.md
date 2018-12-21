@@ -1,4 +1,6 @@
-# ebwt2snp
+# ebwt2snp - version 2
+
+# Tool under development! come back later
 
 ### Overview
 
