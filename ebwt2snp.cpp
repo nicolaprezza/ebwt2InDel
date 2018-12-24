@@ -29,8 +29,8 @@ double pval = 0;
 int max_snvs_def = 3;//maximum number of SNVs allowed in left contexts (excluded main SNV).
 int max_snvs = 0;//maximum number of SNVs allowed in left contexts
 
-int mcov_out_def = 5;//minimum coverage required in the output events
-int mcov_out = 0;//if a SNV is testified at least this number of times, then it is considered as a relevant event
+int mcov_out_def = 3;//minimum cluster length
+int mcov_out = 0;
 
 int max_clust_length_def = 150;
 int max_clust_length = 0;
@@ -48,6 +48,7 @@ int max_err = 0;
 
 string input1;
 string input2;
+string output;
 
 uint64_t nr_reads1 = 0;//TODO remove
 
@@ -78,6 +79,7 @@ void help(){
 	"-h          Print this help." << endl <<
 	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first individual (REQUIRED)." << endl <<
 	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second individual (REQUIRED)." << endl <<
+	"-o <arg>    Output .snp file (REQUIRED)." << endl <<
 	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
 	"-R <arg>    Length of right context, SNP excluded (default: " << k_right_def << ")." << endl <<
 	"-k <arg>    Minimum LCP required in clusters (default: " << K_def << ")" << endl <<
@@ -85,7 +87,7 @@ void help(){
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
 	"-c <arg>    Extract this maximum number of reads per individual to compute consensus of left-context (default: " << consensus_reads_def << ")."<< endl <<
 	"-e <arg>    Mismatches allowed between DNA fragments forming consensus of left-context (default: " << max_err_def << ")."<< endl <<
-	"-m <arg>    Minimum cluster length per individual (default: " << mcov_out_def << "). The minimum cluster length (for the 2 individuals) is 2*<arg>." <<  endl <<
+	"-m <arg>    Minimum cluster length (default: " << mcov_out_def << ")." <<  endl <<
 	"-p <arg>    Automatically choose max cluster length so that this fraction of bases is analyzed (default: " << endl <<
 	"            " << pval_def << "). In any case, the maximum cluster length will not exceed the value specified with -M."<< endl <<
 	"-M <arg>    Maximum cluster length. Read the description of option -p." << endl <<
@@ -399,35 +401,40 @@ pair<char,range_t> consensus_letter(p_range pr){
 
 }
 
-void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx,int len){
+void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx, int & freq, int len){
 
 	if(len==0) return;
 
 	p_range pr = bwt.LF(R);
 	auto c = consensus_letter(pr);
 
+	freq = 0;
+
 	if(c.first!=0){
 
 		ctx += c.first;
-		extract_consensus(bwt, c.second, ctx, len-1);
+		freq = range_length(c.second);
+		extract_consensus(bwt, c.second, ctx,freq, len-1);
 
 	}
 
 }
 
 //extract k_left characters using backward search
-void extract_context(dna_bwt_t & bwt, range_t range, char c, vector<string> & left_contexts, int len){
+void extract_context(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
 
 	string ctx;
 	ctx += c;
 
 	range_t R = bwt.LF(range,c);
 
-	extract_consensus(bwt, R,ctx,len-1);
+	int freq = 0;
+
+	extract_consensus(bwt, R,ctx,freq,len-1);
 
 	reverse(ctx.begin(), ctx.end());
 
-	if(ctx.size()>=k_left) left_contexts.push_back(ctx);
+	if(ctx.size()>=k_left) left_contexts.push_back({ctx,len});
 
 }
 
@@ -484,8 +491,8 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	//now, for each frequent char in each of the two individuals, find the associated left-context
 
-	vector<string> left_contexts_0;
-	vector<string> left_contexts_1;
+	vector<pair<string, int> > left_contexts_0;
+	vector<pair<string, int> > left_contexts_1;
 
 	for(auto c : frequent_char_0) extract_context(bwt1, range1, c, left_contexts_0, k_left);
 	for(auto c : frequent_char_1) extract_context(bwt2, range2, c, left_contexts_1, k_left);
@@ -493,15 +500,16 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	//find right-context
 
 	string right_ctx = "";
+	int right_ctx_freq=0;
 
 	for(auto lctx : left_contexts_0){
 
 		if(right_ctx.size()==0){
 
-			string tmp = string(lctx);
+			string tmp = string(lctx.first);
 			RC(tmp);
 			range_t rn = bwt1.find(tmp);
-			extract_consensus(bwt1, rn, right_ctx, k_right);
+			extract_consensus(bwt1, rn, right_ctx,right_ctx_freq, k_right);
 
 			if(right_ctx.size() < k_right) right_ctx = "";
 
@@ -512,10 +520,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 		if(right_ctx.size()==0){
 
-			string tmp = string(lctx);
+			string tmp = string(lctx.first);
 			RC(tmp);
 			range_t rn = bwt2.find(tmp);
-			extract_consensus(bwt2, rn, right_ctx, k_right);
+			extract_consensus(bwt2, rn, right_ctx,right_ctx_freq, k_right);
 
 			if(right_ctx.size() < k_right) right_ctx = "";
 
@@ -524,10 +532,16 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	}
 
 
-	//TODO build variants
+	for(auto L0 : left_contexts_0){
 
+		for(auto L1 : left_contexts_1){
 
+			if(L0.first.size()>0 and L1.first.size()>0 and right_ctx.size()>0)
+				out.push_back({L0.first,L1.first,right_ctx,L0.second, L1.second});
 
+		}
+
+	}
 
 	return out;
 
@@ -950,6 +964,144 @@ void to_file(vector<variant_t> & output_variants, string & out_path){
 
 
 
+
+/*
+ * detect the type of variant (SNP/indel/discard if none) and, if not discarded, output to file the two reads per variant testifying it.
+ */
+void to_file(vector<variant_t> & output_variants, ofstream & out_file){
+
+	uint64_t id_nr = 1;
+
+	for(auto v:output_variants){
+
+		auto d = distance(v.left_context_0,v.left_context_1);
+
+		if(d.first <= max_snvs_def){
+
+			/*
+			 * sample 1
+			 */
+
+			string ID;
+
+			if(d.second != 0){
+
+				ID =  ">INDEL_higher_path_";
+
+			}else{
+
+				ID =  ">SNP_higher_path_";
+
+			}
+
+			ID.append(to_string(id_nr));
+			ID.append("|P_1:");
+			ID.append(to_string(v.right_context.size()));
+			ID.append("_");
+
+			string snv_type;
+
+			if(d.second==0){
+
+				snv_type += v.left_context_0[v.left_context_0.size()-1];
+				snv_type.append("/");
+				snv_type += v.left_context_1[v.left_context_1.size()-1];
+
+			}else if(d.second>0){//insert of length d.second in v.left_context_0
+
+				snv_type.append(v.left_context_0.substr(v.left_context_0.size()-d.second));
+				snv_type.append("/");
+
+			}else{//insert of length -d.second in v.left_context_1
+
+				snv_type.append("/");
+				snv_type.append(v.left_context_1.substr(v.left_context_1.size() - (-d.second)));
+
+			}
+
+			ID.append(snv_type);
+			ID.append("|");
+			ID.append(std::to_string(v.support_0));//we write the number of reads supporting this variant
+			//ID.append("high");
+			ID.append("|nb_pol_1");
+
+			out_file << ID << endl;
+
+			string DNA;
+
+			if(d.second==0){
+
+				DNA = v.left_context_0;
+
+			}else if(d.second>0){//insert of length d.second in v.left_context_0
+
+				DNA = v.left_context_0;
+
+			}else{//insert of length -d.second in v.left_context_1
+
+				DNA = v.left_context_0.substr(-d.second);
+
+			}
+
+			DNA.append(v.right_context);
+
+			out_file << DNA << endl;
+
+			/*
+			 * sample 2
+			 */
+
+			if(d.second != 0){
+
+				ID =  ">INDEL_lower_path_";
+
+			}else{
+
+				ID =  ">SNP_lower_path_";
+
+			}
+
+			ID.append(to_string(id_nr));
+			ID.append("|P_1:");
+			ID.append(to_string(v.right_context.size()));
+			ID.append("_");
+			ID.append(snv_type);
+			ID.append("|");
+			ID.append(std::to_string(v.support_1));
+			//ID.append("high");
+			ID.append("|nb_pol_1");
+
+			out_file << ID << endl;
+
+			DNA = "";
+
+			if(d.second==0){
+
+				DNA = v.left_context_1;
+
+			}else if(d.second>0){//insert of length d.second in v.left_context_0
+
+				DNA = v.left_context_1.substr(d.second);
+
+			}else{//insert of length -d.second in v.left_context_1
+
+				DNA = v.left_context_1;
+
+			}
+
+			DNA.append(v.right_context);
+			out_file << DNA << endl;
+
+			id_nr++;
+
+		}
+
+	}
+
+}
+
+
+
 /*
  * scans EGSA, clusters and finds interesting clusters. In chunks, extracts the reads
  * from interesting clusters and aligns them.
@@ -1322,7 +1474,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:p:v:L:R:m:g:c:x:y:z:e:k:t:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:p:v:L:R:m:g:c:x:y:z:e:k:t:o:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -1332,6 +1484,9 @@ int main(int argc, char** argv){
 			break;
 			case '1':
 				input1 = string(optarg);
+			break;
+			case 'o':
+				output = string(optarg);
 			break;
 			case '2':
 				input2 = string(optarg);
@@ -1398,7 +1553,7 @@ int main(int argc, char** argv){
 	max_snvs = max_snvs==0?max_snvs_def:max_snvs;
 	mcov_out = mcov_out==0?mcov_out_def:mcov_out;
 
-	if(input1.compare("")==0 or input2.compare("")==0) help();
+	if(input1.compare("")==0 or input2.compare("")==0 or output.compare("")==0) help();
 
 	cout << "This is clust2snp, version 2." << endl <<
 			"Input eBWT files : " << input1 << " and " << input2 << endl <<
@@ -1550,6 +1705,52 @@ int main(int argc, char** argv){
 
 	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
+	cout << "Output events will be stored in " << output << endl;
+	ofstream out_file = ofstream(output);
 
+	uint64_t begin0 = 0;//begin position on indiv. 0
+	uint64_t begin1 = 0;//begin position on indiv. 1
+
+	uint64_t i0 = 0;//current position on indiv. 0
+	uint64_t i1 = 0;//current position on indiv. 1
+
+	uint64_t clust_len=0;
+	bool cluster_open=false;
+
+	for(uint64_t i=0;i<n;++i){
+
+		if(LCP_threshold[i] and not LCP_minima[i]){
+
+			if(cluster_open){//extend current cluster
+				clust_len++;
+			}else{//open new cluster
+				cluster_open=true;
+				clust_len=1;
+				begin0=i0;
+				begin1=i1;
+			}
+
+		}else{
+
+			if(cluster_open){
+
+				if(clust_len>=mcov_out){
+
+					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});
+					to_file(var,out_file);
+
+				}
+
+			}
+
+			cluster_open=false;
+			clust_len = 0;
+
+		}
+
+		i0 += (DA[i]==0);
+		i1 += (DA[i]==1);
+
+	}
 
 }
