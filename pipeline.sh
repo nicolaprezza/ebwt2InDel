@@ -2,34 +2,28 @@
 #
 # behaviour (the steps are skipped if the file they will produce already exists)
 # 1.  Converts input reads to fasta -> reads1.fasta reads2.fasta 
-# 2.  Adds the reverse complements to the reads and concatenates the two read files -> reads1.reads2.frc.fasta
-# 3.  Builds EGSA -> reads1.reads2.frc.fasta.gesa
-# 4.  Run ebwt2clust -> reads1.reads2.frc.fasta.clusters 
-# 5.  Run clust2snp -> reads1.reads2.frc.snp
-# 6.  Run snp2fastq -> reads1.reads2.frc.snp.fastq
-# 7.  Builds BWA MEM index of reference.fasta -> reference.fasta.{amb,ann,bwt,fai,pac,sa} files
-# 8.  Create reference of reads1.fasta using BWA MEM + bcftools + vcfconsensus -> reads1.reference.fasta
-# 9.  Builds BWA MEM index of reads1.reference.fasta -> reads1.reference.fasta.{amb,ann,bwt,fai,pac,sa} files
-# 10. Aligns reads1.reads2.frc.snp.fastq on reads1.reference.fasta -> reads1.reads2.frc.snp.sam
-# 11. Generates VCF (ebwt2snp calls) using sam2vcf -> reads1.reads2.frc.snp.sam.vcf. Filter keeping only variants testified by at least <c> reads -> reads1.reads2.frc.<c>.snp.sam.vcf
-# 12. Generates VCF (bcftools calls) using BWA MEM + bcftools -> reads1.reads2.bcftools.vcf
-# 13. Generate report containing precision/recall of ebwt2snp pipeline (using BWA+bcftools pipeline as ground truth)
+# 2.  Adds the reverse complements to the reads -> reads1.frc.fasta, reads2.frc.fasta
+# 3.  Builds EBWTs -> reads1.frc.fasta.bwt, reads2.frc.fasta.bwt
+# 4.  Run ebwt2snp -> reads1.reads2.frc.fasta.snp 
+# 5.  Run snp2fastq -> reads1.reads2.frc.snp.fastq
+# 6.  Builds BWA MEM index of reference.fasta -> reference.fasta.{amb,ann,bwt,fai,pac,sa} files
+# 7.  Create reference of reads1.fasta using BWA MEM + bcftools + vcfconsensus -> reads1.reference.fasta
+# 8.  Builds BWA MEM index of reads1.reference.fasta -> reads1.reference.fasta.{amb,ann,bwt,fai,pac,sa} files
+# 9. Aligns reads1.reads2.frc.snp.fastq on reads1.reference.fasta -> reads1.reads2.frc.snp.sam
+# 10. Generates VCF (ebwt2snp calls) using sam2vcf -> reads1.reads2.frc.snp.sam.vcf. Filter keeping only variants testified by at least <c> reads -> reads1.reads2.frc.<c>.snp.sam.vcf
+# 11. Generates VCF (bcftools calls) using BWA MEM + bcftools -> reads1.reads2.bcftools.vcf
+# 12. Generate report containing precision/recall of ebwt2snp pipeline (using BWA+bcftools pipeline as ground truth)
 
 # Requires the following executables to be globally visible (in addition to the executables of ebwt2snp): 
 # - fastq2fasta.sh (https://github.com/nicolaprezza/bioinfo-tools)
 # - vcf2fasta.sh (https://github.com/nicolaprezza/bioinfo-tools)
 # - seqtk
-# - egsa (https://github.com/felipelouza/egsa)
+# - eGap (https://github.com/felipelouza/egap)
 # - bwa
 # - samtools
 # - bcftools
 # - bgzip
 # - vcftools
-
-#Byte size of EGSA fields
-GSAtext=4
-GSAsuff=1
-LCP=1
 
 WD=$(dirname $(readlink -f "$1"))
 
@@ -51,15 +45,11 @@ READS2="${READS2%.*}"
 #extract file name of reference
 REF=`basename $3`
 
-#parameter -c in clust2snp (max reads in consensus. Ideally big, but bigger slows down computation)
-#C=$4
-
 #parameter -m in clust2snp (we keep this fixed: at least 4 reads per individual in cluster)
 M=4
 
-TIME_EGSA=${WD}/egsa.time
-TIME_EBWTCLUST=${WD}/ebwt2clust.time
-TIME_CLUST2SNP=${WD}/clust2snp.time
+TIME_EGAP=${WD}/egap.time
+TIME_EBWT2SNP=${WD}/ebwt2snp.time
 TIME_BWAMEM=${WD}/bwamem.time
 TIME_BWAIDX=${WD}/bwaindex.time
 TIME_BCFTOOLS=${WD}/bcftools.time
@@ -85,59 +75,57 @@ fi
 N=`cat ${WD}/${READS1}.fasta | grep '^>' | wc -l`
 N=$((N*2))
 
-# 2.  Adds the reverse complements to the reads and concatenates the two read files -> reads1.reads2.frc.fasta
+# 2.  Adds the reverse complements to the reads -> reads1.frc.fasta, reads2.frc.fasta
 
-if [ ! -f ${WD}/${READS1}.${READS2}.frc.fasta ]; then
-	echo "Adding reverse complement to the reads and building main fasta "${WD}/${READS1}.${READS2}.frc.fasta" ..."
+if [ ! -f ${WD}/${READS1}.frc.fasta ]; then
+	echo "Adding reverse complement to read file 1. Creating file "${WD}/${READS1}.frc.fasta" ..."
 	seqtk seq -r ${WD}/${READS1}.fasta > ${WD}/${READS1}.rc.fasta
+	cat ${WD}/${READS1}.fasta ${WD}/${READS1}.rc.fasta > ${WD}/${READS1}.frc.fasta
+	rm ${WD}/${READS1}.rc.fasta
+fi
+
+if [ ! -f ${WD}/${READS2}.frc.fasta ]; then
+	echo "Adding reverse complement to read file 2. Creating file "${WD}/${READS2}.frc.fasta" ..."
 	seqtk seq -r ${WD}/${READS2}.fasta > ${WD}/${READS2}.rc.fasta
-	cat ${WD}/${READS1}.fasta ${WD}/${READS1}.rc.fasta ${WD}/${READS2}.fasta ${WD}/${READS2}.rc.fasta > ${WD}/${READS1}.${READS2}.frc.fasta
-	rm ${WD}/${READS1}.rc.fasta ${WD}/${READS2}.rc.fasta
+	cat ${WD}/${READS2}.fasta ${WD}/${READS2}.rc.fasta > ${WD}/${READS2}.frc.fasta
+	rm ${WD}/${READS2}.rc.fasta
 fi
 
-# 3.  If EGSA/BCR files do not exist (both), then builds EGSA -> reads1.reads2.frc.fasta.gesa
-if [ ! -f ${WD}/${READS1}.${READS2}.frc.fasta.gesa ]; then
-	if [ ! -f ${WD}/${READS1}.${READS2}.frc.fasta.out ]; then
-		echo "building EGSA ..."
-		/usr/bin/time -v egsa -vvv ${WD}/${READS1}.${READS2}.frc.fasta 0 > ${TIME_EGSA} 2>&1
-		#/usr/bin/time -v gsufsort ${WD}/${READS1}.${READS2}.frc.fasta --gesa ${GSAtext} ${GSAsuff} ${LCP} > ${TIME_EGSA} 2>&1
-		mv ${WD}/${READS1}.${READS2}.frc.fasta.${GSAtext}.${GSAsuff}.${LCP}.1.gesa ${WD}/${READS1}.${READS2}.frc.fasta.gesa
-		
-		rm -rf ${WD}/tmp
-		rm -rf ${WD}/partition
-	fi
+# 3.  Builds EBWTs -> reads1.frc.fasta.bwt, reads2.frc.fasta.bwt
+if [ ! -f ${WD}/${READS1}.frc.fasta.bwt ]; then
+	echo "building eBWT 1 ..."
+	/usr/bin/time -v eGap ${WD}/${READS1}.frc.fasta > ${TIME_EGAP} 2>&1
 fi
 
-# 4.  Run ebwt2clust -> reads1.reads2.frc.fasta.clusters 
-
-if [ ! -f ${WD}/${READS1}.${READS2}.frc.fasta.clusters ]; then
-	echo "running ebwt2clust ..."
-	/usr/bin/time -v ebwt2clust -i ${WD}/${READS1}.${READS2}.frc.fasta -m $((M*2)) -x ${LCP} -y ${GSAtext} -z ${GSAsuff} > ${TIME_EBWTCLUST} 2>&1
+if [ ! -f ${WD}/${READS2}.frc.fasta.bwt ]; then
+	echo "building eBWT 2 ..."
+	/usr/bin/time -v eGap ${WD}/${READS2}.frc.fasta >> ${TIME_EGAP} 2>>&1
 fi
 
-# 5.  Run clust2snp -> reads1.reads2.frc.snp
+
+# 4.  Run ebwt2snp -> reads1.reads2.frc.fasta.snp 
 
 if [ ! -f ${WD}/${READS1}.${READS2}.frc.snp ]; then
-	echo "running clust2snp ..."
-	/usr/bin/time -v clust2snp -i ${WD}/${READS1}.${READS2}.frc.fasta -n $N -x ${LCP} -y ${GSAtext} -z ${GSAsuff} > ${TIME_CLUST2SNP} 2>&1
+	echo "running ebwt2snp ..."
+	/usr/bin/time -v ebwt2snp -1 ${WD}/${READS1}.frc.fasta.bwt -2 ${WD}/${READS2}.frc.fasta.bwt -o ${WD}/${READS1}.${READS2}.frc.snp  > ${TIME_EBWT2SNP} 2>&1
 fi
 
-# 6.  Run snp2fastq -> reads1.reads2.frc.snp.fastq
+
+# 5.  Run snp2fastq -> reads1.reads2.frc.snp.fastq
 
 #if [ ! -f ${WD}/${READS1}.${READS2}.frc.snp.fastq ]; then
 #	echo "converting .snp to .fastq ..."
 #	snp2fastq ${WD}/${READS1}.${READS2}.frc.snp
 #fi
 
-
-# 7.  Builds BWA MEM index of reference.fasta -> reference.fasta.{amb,ann,bwt,fai,pac,sa} files
+# 6.  Builds BWA MEM index of reference.fasta -> reference.fasta.{amb,ann,bwt,fai,pac,sa} files
 
 if [ ! -f ${WD}/${REF}.amb ]; then
 	echo "Indexing "${WD}/${REF}" (BWA) ..."
 	bwa index ${WD}/${REF}
 fi
 
-# 8.  Create reference of reads1.fasta using BWA MEM + bcftools + vcfconsensus
+# 7.  Create reference of reads1.fasta using BWA MEM + bcftools + vcfconsensus
 
 if [ "$samtool_version" -eq "1" ]; then
 	if [ ! -f ${WD}/${READS1}.reference.fasta ]; then
@@ -186,21 +174,21 @@ else
 	fi
 fi
 
-# 9.  Builds BWA MEM index of reads1.reference.fasta -> reads1.reference.fasta.{amb,ann,bwt,fai,pac,sa} files
+# 8.  Builds BWA MEM index of reads1.reference.fasta -> reads1.reference.fasta.{amb,ann,bwt,fai,pac,sa} files
 
 if [ ! -f ${WD}/${READS1}.reference.fasta.amb ]; then
 	echo "Indexing "${WD}/${READS1}.reference.fasta" (BWA) ..."
 	/usr/bin/time -v bwa index ${WD}/${READS1}.reference.fasta > ${TIME_BWAIDX} 2>&1
 fi
 
-# 10.  Aligns reads1.reads2.frc.snp.fastq on reads1.reference.fasta -> reads1.reads2.frc.snp.sam
+# 9.  Aligns reads1.reads2.frc.snp.fastq on reads1.reference.fasta -> reads1.reads2.frc.snp.sam
 
 #if [ ! -f ${WD}/${READS1}.${READS2}.frc.snp.sam ]; then
 #	echo "Aligning "${WD}/${READS1}.${READS2}.frc.snp.fastq" on "${WD}/${READS1}.reference.fasta" ..."
 #	bwa mem ${WD}/${READS1}.reference.fasta ${WD}/${READS1}.${READS2}.frc.snp.fastq -o ${WD}/${READS1}.${READS2}.frc.snp.sam 
 #fi
 
-# 11. Generates VCF (ebwt2snp calls) using sam2vcf -> reads1.reads2.frc.snp.sam.vcf
+# 10. Generates VCF (ebwt2snp calls) using sam2vcf -> reads1.reads2.frc.snp.sam.vcf
 
 #if [ ! -f ${WD}/${READS1}.${READS2}.frc.${C}.snp.sam.vcf ]; then
 #	echo "Generating ebwt2snp's VCF in "${WD}/${READS1}.${READS2}.frc.snp.sam.vcf" ..."
@@ -210,7 +198,7 @@ fi
 #	cat ${WD}/${READS1}.${READS2}.frc.snp.sam.vcf | awk -v c="$C" '$8>=c && $9>=c' > ${WD}/${READS1}.${READS2}.frc.${C}.snp.sam.vcf
 #fi
 
-# 12. Generates VCF (bcftools calls) using BWA MEM + bcftools -> reads1.reads2.bcftools.vcf
+# 11. Generates VCF (bcftools calls) using BWA MEM + bcftools -> reads1.reads2.bcftools.vcf
 
 if [ "$samtool_version" -eq "1" ]; then
 	if [ ! -f ${WD}/${READS1}.${READS2}.bcftools.vcf ]; then
@@ -252,7 +240,7 @@ else
 fi
 
 
-# 13. Compute precision/sensitivity of ebwt2snp pipeline using different thresholds for minimum coverage
+# 12. Compute precision/sensitivity of ebwt2snp pipeline using different thresholds for minimum coverage
 
 if [ ! -f ${WD}/${READS1}.${READS2}.report_3 ]; then
 
