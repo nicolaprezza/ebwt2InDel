@@ -55,9 +55,11 @@ vector<bool> DA;
 uint64_t n_clust = 0; //number of clusters
 uint64_t n_bases = 0; //number of bases in clusters
 
+uint64_t id_nr = 1;
+
 void help(){
 
-	cout << "clust2snp [options]" << endl <<
+	cout << "ebwt2snp [options]" << endl <<
 	"Options:" << endl <<
 	"-h          Print this help." << endl <<
 	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first individual (REQUIRED)." << endl <<
@@ -71,7 +73,7 @@ void help(){
 	"-m <arg>    Minimum coverage of events (default: " << mcov_out_def << ")." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
-	"\nTo run clust2snp, you must first build (1) the Enhanced Generalized Suffix Array of the input sequences" << endl <<
+	"\nTo run ebwt2snp, you must first build (1) the Enhanced Generalized Suffix Array of the input sequences" << endl <<
 	"and the  cluster file built with ebwt2snp. Output is stored in reads.snp (this  is actually a fasta" << endl <<
 	"file), where reads.fasta is the input fasta file." << endl << endl <<
 
@@ -377,8 +379,12 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 			for(auto L1 : left_contexts_1){
 
-				if(L0.first.size()>0 and L1.first.size()>0)
-					out.push_back({L0.first,L1.first,right_ctx,L0.second, L1.second});
+				if(L0.first.size()>0 and L1.first.size()>0){
+
+					if(L0.first[L0.first.size()-1] != L1.first[L1.first.size()-1])
+						out.push_back({L0.first,L1.first,right_ctx,L0.second, L1.second});
+
+				}
 
 			}
 
@@ -394,8 +400,6 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
  * detect the type of variant (SNP/indel/discard if none) and, if not discarded, output to file the two reads per variant testifying it.
  */
 void to_file(vector<variant_t> & output_variants, ofstream & out_file){
-
-	uint64_t id_nr = 1;
 
 	for(auto v:output_variants){
 
@@ -766,7 +770,7 @@ int main(int argc, char** argv){
 
 	if(input1.compare("")==0 or input2.compare("")==0 or output.compare("")==0) help();
 
-	cout << "This is clust2snp, version 2." << endl <<
+	cout << "This is ebwt2snp, version 2." << endl <<
 			"Input eBWT files : " << input1 << " and " << input2 << endl <<
 			"Left-extending eBWT ranges by " << k_left << " bases." << endl <<
 			"Right context length: " << k_right << " bases." << endl << endl;

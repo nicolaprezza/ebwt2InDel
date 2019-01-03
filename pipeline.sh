@@ -107,7 +107,7 @@ fi
 
 if [ ! -f ${WD}/${READS1}.${READS2}.frc.snp ]; then
 	echo "running ebwt2snp ..."
-	/usr/bin/time -v ebwt2snp -1 ${WD}/${READS1}.frc.fasta.bwt -2 ${WD}/${READS2}.frc.fasta.bwt -o ${WD}/${READS1}.${READS2}.frc.snp  > ${TIME_EBWT2SNP} 2>&1
+	/usr/bin/time -v ebwt2snp -1 ${WD}/${READS1}.frc.fasta.bwt -2 ${WD}/${READS2}.frc.fasta.bwt -o ${WD}/${READS1}.${READS2}.frc.snp -t 0 > ${TIME_EBWT2SNP} 2>&1
 fi
 
 
