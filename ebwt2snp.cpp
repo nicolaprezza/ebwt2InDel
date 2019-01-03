@@ -68,7 +68,7 @@ void help(){
 	"-k <arg>    Minimum LCP required in clusters (default: " << K_def << ")" << endl <<
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
-	"-m <arg>    Minimum cluster length (default: " << mcov_out_def << ")." <<  endl <<
+	"-m <arg>    Minimum coverage of events (default: " << mcov_out_def << ")." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run clust2snp, you must first build (1) the Enhanced Generalized Suffix Array of the input sequences" << endl <<
@@ -124,7 +124,6 @@ int dH(string & a, string & b){
  *
  * 	1. find if there is an indel at the rightmost end (of max length max_gap)
  * 	2. skip the indel and count number of mismatches in the remaining part
- *
  *
  * 	returns a pair <D,L>, where:
  *
@@ -211,6 +210,8 @@ pair<char,range_t> consensus_letter(p_range pr){
 
 }
 
+//extract len characters using backward search from range. At each step, most frequent character is chosen.
+//note: the reversed string is returned
 void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx, int & freq, int len){
 
 	if(len==0) return;
@@ -227,6 +228,24 @@ void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx, int & freq, int 
 		extract_consensus(bwt, c.second, ctx,freq, len-1);
 
 	}
+
+}
+
+//extract len characters using backward search, starting from position in range containing character c
+void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
+
+	string ctx;
+	ctx += c;
+
+	range_t R = bwt.LF(range,c);
+
+	int freq = 0;
+
+	extract_consensus(bwt, R,ctx,freq,len-1);
+
+	reverse(ctx.begin(), ctx.end());
+
+	if(ctx.size()==len) left_contexts.push_back({ctx,freq});
 
 }
 
@@ -269,24 +288,6 @@ string extract_dna(dna_bwt_t & bwt, uint64_t i){
 
 }
 
-//extract k_left characters using backward search, starting from position in range containing character c
-void extract_context(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
-
-	string ctx;
-	ctx += c;
-
-	range_t R = bwt.LF(range,c);
-
-	int freq = 0;
-
-	extract_consensus(bwt, R,ctx,freq,len-1);
-
-	reverse(ctx.begin(), ctx.end());
-
-	if(ctx.size()>=k_left) left_contexts.push_back({ctx,len});
-
-}
-
 /*
  * input: bwts and ranges of cluster (right-excluded)
  *
@@ -302,8 +303,8 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	uint64_t max_lcp_read_idx = 0;//index of read with max LCP in cluster
 	uint64_t max_lcp_read_pos = 0;//position in read where max LCP starts
 
-	for(uint64_t i=range1.first;i<range1.second;++i) counts[0][bwt1[i]]++;
-	for(uint64_t i=range2.first;i<range2.second;++i) counts[1][bwt2[i]]++;
+	for(uint64_t i=range1.first;i<range1.second;++i) counts[0][base_to_int(bwt1[i])]++;
+	for(uint64_t i=range2.first;i<range2.second;++i) counts[1][base_to_int(bwt2[i])]++;
 
 	//compute the lists of frequent characters in indiv 0 and 1
 	vector<unsigned char> frequent_char_0;
@@ -338,13 +339,14 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	}
 
-	//for each frequent char in each of the two individuals, find the associated left-context using backward search
+	//for each frequent char in each of the two individuals, find the associated
+	//left-context and corresponding coverage using backward search
 
 	vector<pair<string, int> > left_contexts_0;
 	vector<pair<string, int> > left_contexts_1;
 
-	for(auto c : frequent_char_0) extract_context(bwt1, range1, c, left_contexts_0, k_left);
-	for(auto c : frequent_char_1) extract_context(bwt2, range2, c, left_contexts_1, k_left);
+	for(auto c : frequent_char_0) extract_consensus(bwt1, range1, c, left_contexts_0, k_left);
+	for(auto c : frequent_char_1) extract_consensus(bwt2, range2, c, left_contexts_1, k_left);
 
 	//find right-context
 
@@ -399,7 +401,7 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 		auto d = distance(v.left_context_0,v.left_context_1);
 
-		if(d.first <= max_snvs_def){
+		if(d.first <= max_snvs){
 
 			/*
 			 * sample 1
@@ -746,6 +748,9 @@ int main(int argc, char** argv){
 			case 'v':
 				max_snvs = atoi(optarg);
 			break;
+			case 't':
+				TERM = atoi(optarg);
+			break;
 			default:
 				help();
 			return -1;
@@ -794,7 +799,7 @@ int main(int argc, char** argv){
 
 	{
 
-		auto TMP_LEAVES = vector<pair<sa_leaf, sa_leaf> >(5);
+		auto TMP_LEAVES = vector<pair<sa_leaf, sa_leaf> >(4);
 
 		stack<pair<sa_leaf, sa_leaf> > S;
 		S.push({bwt1.first_leaf(), bwt2.first_leaf()});
@@ -928,6 +933,11 @@ int main(int argc, char** argv){
 	uint64_t clust_len=0;
 	bool cluster_open=false;
 
+	int perc = -1;
+	int last_perc = -1;
+
+	uint64_t n_clusters = 0; //number of clusters analyzed
+
 	for(uint64_t i=0;i<n;++i){
 
 		if(LCP_threshold[2*i] and not LCP_minima[i]){
@@ -943,10 +953,11 @@ int main(int argc, char** argv){
 
 		}else{
 
-			if(cluster_open){
+			if(cluster_open){//close current cluster
 
 				if(clust_len>=mcov_out){
 
+					n_clusters++;
 					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});
 					to_file(var,out_file);
 
@@ -962,6 +973,19 @@ int main(int argc, char** argv){
 		i0 += (DA[i]==0);
 		i1 += (DA[i]==1);
 
+		perc = (100*i)/n;
+
+		if(perc > last_perc){
+
+			cout << perc << "%. ";
+			cout << endl;
+
+			last_perc = perc;
+
+		}
+
 	}
+
+	cout << endl << "Done. Analyzed " << n_clusters << " clusters." << endl;
 
 }
