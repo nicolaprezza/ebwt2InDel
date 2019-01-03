@@ -72,6 +72,29 @@ public:
 	}
 
 	/*
+	 * apply LF function to position i
+	 */
+	uint64_t LF(uint64_t i){
+
+		char c = BWT[i];
+
+		uint64_t r = BWT.rank(i,c);
+
+		switch(c){
+
+			case 'A' : r += F_A; break;
+			case 'C' : r += F_C; break;
+			case 'G' : r += F_G; break;
+			case 'T' : r += F_T; break;
+
+		}
+
+		return r;
+
+	}
+
+
+	/*
 	 * left-extend range by all 4 nucleotides
 	 */
 	p_range LF(range_t rn){
