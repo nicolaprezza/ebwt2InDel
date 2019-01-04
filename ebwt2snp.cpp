@@ -923,6 +923,10 @@ int main(int argc, char** argv){
 	int last_perc = -1;
 
 	uint64_t n_clusters = 0; //number of clusters analyzed
+	uint64_t clust_size = 0; //cumulative cluster size
+
+	uint64_t MAX_CLUST_LEN = 100;
+	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
 
 	for(uint64_t i=0;i<n;++i){
 
@@ -941,8 +945,11 @@ int main(int argc, char** argv){
 
 			if(cluster_open){//close current cluster
 
-				if(clust_len>=mcov_out){
+				if(clust_len<=MAX_CLUST_LEN) CLUST_SIZES[clust_len]+=clust_len;
 
+				if(clust_len>=2*mcov_out){
+
+					clust_size += clust_len;
 					n_clusters++;
 					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});
 					to_file(var,out_file);
@@ -972,6 +979,21 @@ int main(int argc, char** argv){
 
 	}
 
-	cout << endl << "Done. Analyzed " << n_clusters << " clusters." << endl;
+	cout 	<< endl << "Done." << endl <<
+			"Analyzed " << n_clusters << " clusters." << endl <<
+			"Average cluster length: " << double(clust_size)/n_clusters << "." << endl << endl <<
+			"Distribution of bases inside clusters (cluster length / number of bases inside clusters of that length): " << endl << endl;
+
+
+
+	uint64_t scale = *max_element(CLUST_SIZES.begin(), CLUST_SIZES.end());
+
+	for(int i=0;i<=MAX_CLUST_LEN;++i){
+
+		cout << i << ( i < 10 ? "   " : (i<100 ? "  " : " "));
+		for(uint64_t j = 0; j < (100*CLUST_SIZES[i])/scale; ++j) cout << "-";
+		cout << " " << CLUST_SIZES[i] << endl;
+
+	}
 
 }
