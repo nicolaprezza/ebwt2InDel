@@ -78,6 +78,9 @@ public:
 
 		char c = BWT[i];
 
+		//LF/FL do not apply to terminators if reads are not lex-sorted in input
+		assert(c != TERM);
+
 		uint64_t r = BWT.rank(i,c);
 
 		switch(c){
@@ -93,6 +96,41 @@ public:
 
 	}
 
+	// F column
+	char F(uint64_t i){
+
+		return 	i < F_A ? TERM : (
+				i < F_C ? 'A'  : (
+				i < F_G ? 'C'  : (
+				i < F_T ? 'G'  : 'T'
+				)
+				)
+				);
+
+	}
+
+	/*
+	 * apply FL (psi) function to position i
+	 */
+	uint64_t FL(uint64_t i){
+
+		char c = F(i);
+
+		//LF/FL do not apply to terminators if reads are not lex-sorted in input
+		assert(c != TERM);
+
+		//r = F.rank(i,c)
+		uint64_t r = 	i < F_A ? i : (
+						i < F_C ? i-F_A  : (
+						i < F_G ? i-F_C  : (
+						i < F_T ? i-F_G  : i-F_T
+						)
+						)
+		);
+
+		return BWT.select(r,c);
+
+	}
 
 	/*
 	 * left-extend range by all 4 nucleotides

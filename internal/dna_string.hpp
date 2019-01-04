@@ -41,6 +41,7 @@
 #define ALN 64							//alignment
 
 #include "include.hpp"
+#include <cassert>
 
 class dna_string{
 
@@ -87,8 +88,10 @@ public:
 				BUF[i%BLOCK_SIZE] = c;
 
 				if(c!='A' and c!='C' and c!='G' and c!='T' and c!=TERM){
-					cout << "Error while reading file: read forbidden character '" <<  c << "' (ASCII code " << int(c) << ")." << endl;
-					cout << "Only A,C,G,T, and " << TERM << " are admitted in the input BWT!" << endl;
+					cout << "Error while reading file: read forbidden character '" <<  c << "' (ASCII code " << int(c) << ")." << endl <<
+					"Only A,C,G,T, and " << TERM << " are admitted in the input BWT!" << endl <<
+					"If the unknown character is the terminator, you can solve the problem by adding option \"-t " << int(c) << "\"." << endl;
+
 					exit(1);
 				}
 
@@ -105,37 +108,6 @@ public:
 		build_rank_support();
 
 	}
-
-	/*
-	 * set the i-th character to c.
-	 *
-	void set(uint64_t i, uint8_t c){
-
-		assert(i<n);
-
-		//A is 0x0
-		uint64_t b = 	(c == 'C')*  0x1 +
-						(c == 'G')*  0x2 +
-						(c == 'T')*  0x3 +
-						(c == TERM)* 0x4;
-
-		uint64_t superblock_number = i / SUPERBLOCK_SIZE;
-		uint64_t superblock_off = i % SUPERBLOCK_SIZE;
-		uint64_t block_number = superblock_off / BLOCK_SIZE;
-		uint64_t block_off = superblock_off % BLOCK_SIZE;
-
-		//chars[2,1,0] contains 1st, 2nd, 3rd bits of the BLOCK_SIZE characters
-		__uint128_t* chars = (__uint128_t*)(data + superblock_number*BYTES_PER_SUPERBLOCK + block_number*BYTES_PER_BLOCK);
-
-		//from rightmost to leftmost bit
-		chars[0] |= ((__uint128_t(b&0x1))<<(BLOCK_SIZE-(block_off+1)));
-		chars[1] |= ((__uint128_t((b&0x2)>>1))<<(BLOCK_SIZE-(block_off+1)));
-		chars[2] |= ((__uint128_t((b&0x4)>>2))<<(BLOCK_SIZE-(block_off+1)));
-
-		assert(operator[](i)==c);
-
-	}*/
-
 
 	//return i-th character
 	char operator[](uint64_t i){
@@ -184,6 +156,8 @@ public:
 	 */
 	uint64_t rank(uint64_t i, uint8_t c){
 
+		assert(i<=n);
+
 		p_rank pr = parallel_rank(i);
 
 		if(c==TERM) return rank_non_dna(i);
@@ -198,6 +172,21 @@ public:
 		return 0;
 
 	}
+
+	/*
+	 * select. Implemented with binary search + rank (much more inefficient than rank!)
+	 *
+	 * indexes start from 0
+	 *
+	 */
+	uint64_t select(uint64_t i, uint8_t c){
+
+		assert(i<rank(n,c));
+
+		return select(i,0,n,c);
+
+	}
+
 
 	/*
 	 * return number of non-dna symbols in the prefix of length i of the text. At most 1 cache miss!
@@ -258,6 +247,30 @@ public:
 	}
 
 private:
+
+	/*
+	 * find the i-th c. Assumption: the i-th c is inside range [0,n).
+	 */
+	uint64_t select(uint64_t i, uint64_t begin, uint64_t end, uint8_t c){
+
+		assert(end>begin);
+
+		if(end==begin+1){
+
+			assert(rank(end,c) == rank(begin,c)+1);
+			assert(rank(begin,c)==i);
+			return begin;
+
+		}
+
+		uint64_t m = (begin+end)/2;
+		uint64_t r = rank(m,c);
+
+		if(r > i) 	return select(i,begin,m,c);
+		else		return select(i,m,end,c);
+
+	}
+
 
 	void build_rank_support(){
 

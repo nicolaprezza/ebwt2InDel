@@ -73,11 +73,10 @@ void help(){
 	"-m <arg>    Minimum coverage of events (default: " << mcov_out_def << ")." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
-	"\nTo run ebwt2snp, you must first build (1) the Enhanced Generalized Suffix Array of the input sequences" << endl <<
-	"and the  cluster file built with ebwt2snp. Output is stored in reads.snp (this  is actually a fasta" << endl <<
-	"file), where reads.fasta is the input fasta file." << endl << endl <<
+	"\nTo run ebwt2snp, you must first build the etended Burrows-Wheeler Transform of the input sequences." << endl <<
+	"Output is stored in the file specified with option -o (this  is actually a fasta file)." << endl << endl <<
 
-	"Output:  SNPs are output in KisSNP2 format as a fasta file. IMPORTANT: in many cases, each SNP/indel is" << endl <<
+	"Output format:  SNPs are output in KisSNP2 format as a fasta file. IMPORTANT: in many cases, each SNP/indel is" << endl <<
 	"reported twice: one time on the forward strand and one on the reverse strand. " << endl;
 
 	exit(0);
@@ -252,39 +251,23 @@ void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<strin
 }
 
 /*
- * extract read suffix starting from SA[i] and ending at # (excluded)
+ * extract the DNA string of length len starting from SA[i].
+ * If # is found while extracting, extraction is interrupted (# is not returned in the result string).
  */
-string extract_dna(dna_bwt_t & bwt, uint64_t i){
+string extract_dna(dna_bwt_t & bwt, uint64_t i, int64_t len){
 
 	string res;
 
-	uint64_t start = i;
-	uint64_t steps = 0;
+	char c = bwt.F(i);
 
-	//find read terminator
-	while(bwt[i] != TERM){
+	while(c != TERM and len > 0){
 
-		i = bwt.LF(i);
-		steps++;
-
-		assert(steps<=MAX_READ_LEN);
+		res += c;
+		i = bwt.FL(i);
+		c = bwt.F(i);
+		len--;
 
 	}
-
-	i = bwt.LF(i);
-	steps=1;
-
-	while(i != start){
-
-		res += bwt[i];
-		i = bwt.LF(i);
-		steps++;
-
-		assert(steps<=MAX_READ_LEN);
-
-	}
-
-	std::reverse(res.begin(), res.end());
 
 	return res;
 
@@ -370,9 +353,8 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	//found good right context
 	if(i<range1.second + range2.second and LCP_threshold[2*i+1]){
 
-		right_ctx = extract_dna(DA[i] ? bwt2 : bwt1, DA[i] ? i1 : i0);
-		assert(right_ctx.length() >= k_right);
-		right_ctx = right_ctx.substr(0,k_right);
+		right_ctx = extract_dna(DA[i] ? bwt2 : bwt1, DA[i] ? i1 : i0, k_right);
+		assert(right_ctx.length() == k_right);
 
 		//store all variants found
 		for(auto L0 : left_contexts_0){
