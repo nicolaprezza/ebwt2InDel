@@ -670,24 +670,47 @@ void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, 
 void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 /*
- * we have a minima at the beginning of each child of size at least 2 of the input node
+ * we have a minimum at the beginning of each child of size at least 2 of the input node, except
+ * the first child after child # (if present) or first child (if # not present)
  */
 
 	//x.first_A is the end position (excluded) of terminator.
 
-	if(x.first_G - x.first_C >= 2 and x.first_C > x.first_A){
+	//size of last seen child
+	bool exists_child_of_size_2 = x.first_C - x.first_A >= 2;//size of A >= 2
+
+	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
+		x.first_C > x.first_A	   and	// 'C' is not the first child or the first child after #
+		exists_child_of_size_2			// this is a minimum only if A has size >=2
+		){
+
 		LCP_minima[x.first_C] = true;
 		n_min++;
+
 	}
 
-	if(x.first_T - x.first_G >= 2 and x.first_G > x.first_A){
+	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_G - x.first_C >= 2);//size of C >= 2
+
+	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
+		x.first_G > x.first_A	   and	// 'G' is not the first child or the first child after #
+		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+		){
+
 		LCP_minima[x.first_G] = true;
 		n_min++;
+
 	}
 
-	if(x.last - x.first_T >= 2 and x.first_T > x.first_A){
+	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_T - x.first_G >= 2);//size of G >= 2
+
+	if( x.last - x.first_T >= 2 and 	// there are at least 2 'T'
+		x.first_T > x.first_A	   and	// 'T' is not the first child or the first child after #
+		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+		){
+
 		LCP_minima[x.first_T] = true;
 		n_min++;
+
 	}
 
 }
@@ -925,7 +948,7 @@ int main(int argc, char** argv){
 	uint64_t n_clusters = 0; //number of clusters analyzed
 	uint64_t clust_size = 0; //cumulative cluster size
 
-	uint64_t MAX_CLUST_LEN = 100;
+	uint64_t MAX_CLUST_LEN = 200;
 	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
 
 	for(uint64_t i=0;i<n;++i){
@@ -945,11 +968,12 @@ int main(int argc, char** argv){
 
 			if(cluster_open){//close current cluster
 
+				clust_size += clust_len;
+
 				if(clust_len<=MAX_CLUST_LEN) CLUST_SIZES[clust_len]+=clust_len;
 
 				if(clust_len>=2*mcov_out){
 
-					clust_size += clust_len;
 					n_clusters++;
 					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});
 					to_file(var,out_file);
