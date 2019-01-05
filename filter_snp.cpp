@@ -22,7 +22,7 @@ void help(){
 
 int main(int argc, char** argv){
 
-	if(argc != 3) help();
+	if(argc != 4) help();
 
 	string infile = argv[1];
 	int m = atoi(argv[2]);
