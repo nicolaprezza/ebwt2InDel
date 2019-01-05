@@ -676,11 +676,9 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 	//x.first_A is the end position (excluded) of terminator.
 
-	//size of last seen child
 	bool exists_child_of_size_2 = x.first_C - x.first_A >= 2;//size of A >= 2
 
 	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
-		x.first_C > x.first_A	   and	// 'C' is not the first child or the first child after #
 		exists_child_of_size_2			// this is a minimum only if A has size >=2
 		){
 
@@ -692,7 +690,6 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_G - x.first_C >= 2);//size of C >= 2
 
 	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
-		x.first_G > x.first_A	   and	// 'G' is not the first child or the first child after #
 		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
 		){
 
@@ -704,7 +701,6 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_T - x.first_G >= 2);//size of G >= 2
 
 	if( x.last - x.first_T >= 2 and 	// there are at least 2 'T'
-		x.first_T > x.first_A	   and	// 'T' is not the first child or the first child after #
 		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
 		){
 
