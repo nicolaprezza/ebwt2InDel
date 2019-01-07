@@ -39,6 +39,8 @@ string output;
 
 bool bcr = false;
 
+bool diploid = true;
+
 bool discoSNP=true;
 
 int K_def = 16;
@@ -71,6 +73,7 @@ void help(){
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
 	"-m <arg>    Minimum coverage of events (default: " << mcov_out_def << ")." <<  endl <<
+	"-H          Samples are haploid (default: diploid)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run ebwt2snp, you must first build the etended Burrows-Wheeler Transform of the input sequences." << endl <<
@@ -314,10 +317,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
 		frequent_char_1.size()==0 or // not covered enough
-		frequent_char_0.size()>2 or // we require at most 2 alleles per individual
-		frequent_char_1.size()>2 or // we require  at most 2 alleles per individual
-		frequent_char_0 == frequent_char_1 or // same alleles: probably both heterozigous / multiple region (and no variants)
-		all_chars.size() > 3	//4 or more distinct frequent characters in the cluster (probably multiple region)
+		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
+		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
+		frequent_char_0 == frequent_char_1 or 			// same alleles: probably both heterozigous / multiple region (and no variants)
+		all_chars.size() > (diploid ? 3 : 2)			// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
 		return out;
@@ -718,7 +721,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:H")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -755,6 +758,9 @@ int main(int argc, char** argv){
 			break;
 			case 't':
 				TERM = atoi(optarg);
+			break;
+			case 'H':
+				diploid = false;
 			break;
 			default:
 				help();
