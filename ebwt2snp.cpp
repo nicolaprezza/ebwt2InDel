@@ -23,10 +23,10 @@ int k_left = 0;//extract k_left nucleotides from left of suffix array range, for
 int k_right_def = 30;//extract k_right nucleotides from right of suffix array range, only for entry with max LCP
 int k_right = 0;//extract k_right nucleotides from right of suffix array range, for each entry in the cluster
 
-int max_snvs_def = 3;//maximum number of SNVs allowed in left contexts (excluded main SNV).
+int max_snvs_def = 2;//maximum number of SNVs allowed in left contexts (excluded main SNV).
 int max_snvs = 0;//maximum number of SNVs allowed in left contexts
 
-int mcov_out_def = 3;//minimum cluster length
+int mcov_out_def = 4;//minimum cluster length / coverage of output events
 int mcov_out = 0;
 
 //max indel length. If 0, indels are disabled.
@@ -39,7 +39,7 @@ string output;
 
 bool bcr = false;
 
-bool diploid = true;
+bool diploid = false;
 
 bool discoSNP=true;
 
@@ -74,14 +74,13 @@ void help(){
 	"-k <arg>    Minimum LCP required in clusters (default: " << K_def << ")" << endl <<
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
-	"-m <arg>    Minimum coverage of events (default: " << mcov_out_def << ")." <<  endl <<
-	"-H          Samples are haploid (default: diploid)." <<  endl <<
+	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
+	"-D          Samples are diploid (default: haploid)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
-	"\nTo run ebwt2snp, you must first build the etended Burrows-Wheeler Transform of the input sequences." << endl <<
-	"Output is stored in the file specified with option -o (this  is actually a fasta file)." << endl << endl <<
+	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
 
-	"Output format:  SNPs are output in KisSNP2 format as a fasta file. IMPORTANT: in many cases, each SNP/indel is" << endl <<
+	"Output format:  SNPs are output in KisSNP2 format as a fasta file. NOTE: in many cases, each SNP/indel is" << endl <<
 	"reported twice: one time on the forward strand and one on the reverse strand. " << endl;
 
 	exit(0);
@@ -392,7 +391,7 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 		auto d = distance(v.left_context_0,v.left_context_1);
 
-		if(d.first <= max_snvs){
+		if(d.first <= max_snvs and v.support_0 >= mcov_out and v.support_1 >= mcov_out){
 
 			/*
 			 * sample 1
@@ -762,7 +761,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:H")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:D")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -800,8 +799,8 @@ int main(int argc, char** argv){
 			case 't':
 				TERM = atoi(optarg);
 			break;
-			case 'H':
-				diploid = false;
+			case 'D':
+				diploid = true;
 			break;
 			default:
 				help();
@@ -821,7 +820,21 @@ int main(int argc, char** argv){
 	cout << "This is ebwt2snp, version 2." << endl <<
 			"Input eBWT files : " << input1 << " and " << input2 << endl <<
 			"Left-extending eBWT ranges by " << k_left << " bases." << endl <<
-			"Right context length: " << k_right << " bases." << endl << endl;
+			"Right context length: " << k_right << " bases." << endl <<
+			"Storing output events to file " << output << endl <<
+			"Minimum coverage of output events: " << mcov_out << endl;
+
+	if(diploid){
+
+		cout << "Diploid samples." << endl;
+
+	}else{
+
+		cout << "Haploid samples." << endl;
+
+	}
+
+	cout << endl;
 
 	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
 
