@@ -843,6 +843,7 @@ int main(int argc, char** argv){
 	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
 	 */
 	LCP_threshold = vector<bool>(2*n,false);
+	LCP = vector<uint8_t>(n,0);//TODO debug
 
 	uint64_t da_values = 0;//number computed DA values
 	uint64_t leaves = 0;//number of visited leaves
@@ -908,8 +909,6 @@ int main(int argc, char** argv){
 	cout << "Phase 3/4: computing LCP minima." << endl;
 
 	LCP_minima = vector<bool>(n,false);
-
-	LCP = vector<uint8_t>(n,0);//TODO debug
 
 	auto TMP_NODES = vector<pair<sa_node, sa_node> >(4);
 
@@ -981,14 +980,14 @@ int main(int argc, char** argv){
 
 		if(LCP_minima[i]){
 
-			if(not (LCP[i-1] >= LCP[i] and LCP[i+1] > LCP[i])){
-				cout << "Error: LCP_minima=1 but LCP = " << LCP[i-1] << " " << LCP[i] << " " <<  LCP[i+1] << endl;
+			if(not (LCP[i-1] > LCP[i] and LCP[i+1] >= LCP[i])){
+				cout << "Error: LCP_minima=1 but LCP = " << (uint32_t)LCP[i-1] << " " << (uint32_t)LCP[i] << " " <<  (uint32_t)LCP[i+1] << endl;
 			}
 
 		}else{
 
-			if(LCP[i-1] >= LCP[i] and LCP[i+1] > LCP[i]){
-				cout << "Error: LCP_minima=0 but LCP = " << LCP[i-1] << " " << LCP[i] << " " <<  LCP[i+1] << endl;
+			if(LCP[i-1] > LCP[i] and LCP[i+1] >= LCP[i]){
+				cout << "Error: LCP_minima=0 but LCP = " << (uint32_t)LCP[i-1] << " " << (uint32_t)LCP[i] << " " <<  (uint32_t)LCP[i+1] << endl;
 			}
 
 		}
