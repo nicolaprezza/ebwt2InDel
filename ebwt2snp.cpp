@@ -54,6 +54,8 @@ vector<bool> LCP_minima;
 vector<bool> LCP_threshold;
 vector<bool> DA;
 
+vector<uint8_t> LCP;//TODO: only for debug
+
 uint64_t n_clust = 0; //number of clusters
 uint64_t n_bases = 0; //number of bases in clusters
 
@@ -539,6 +541,8 @@ void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
 		LCP_threshold[2*i] = (L1.depth >= K);
 		LCP_threshold[2*i+1] = (L1.depth >= k_right);
 
+		LCP[i] = L1.depth;//TODO debug
+
 		lcp_values++;
 
 	}
@@ -670,19 +674,59 @@ void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, 
 
 }
 
+//void update_lcp_minima(sa_node x, uint64_t & n_min){
+//
+///*
+// * we have a minimum at the beginning of each child of size at least 2 of the input node, except
+// * the first child after child # (if present) or first child (if # not present)
+// */
+//
+//	//x.first_A is the end position (excluded) of terminator.
+//
+//	bool exists_child_of_size_2 = x.first_C - x.first_A >= 2;//size of A >= 2
+//
+//	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
+//		exists_child_of_size_2			// this is a minimum only if A has size >=2
+//		){
+//
+//		LCP_minima[x.first_C] = true;
+//		n_min++;
+//
+//	}
+//
+//	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_G - x.first_C >= 2);//size of C >= 2
+//
+//	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
+//		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+//		){
+//
+//		LCP_minima[x.first_G] = true;
+//		n_min++;
+//
+//	}
+//
+//	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_T - x.first_G >= 2);//size of G >= 2
+//
+//	if( x.last - x.first_T >= 2 and 	// there are at least 2 'T'
+//		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+//		){
+//
+//		LCP_minima[x.first_T] = true;
+//		n_min++;
+//
+//	}
+//
+//}
+
 void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 /*
- * we have a minimum at the beginning of each child of size at least 2 of the input node, except
- * the first child after child # (if present) or first child (if # not present)
+ * we have a minimum after the end of each child (that is different than #) of size at least 2 of the input node x, except
+ * if the candidate minimum position is the last or exceeds the interval of x
  */
 
-	//x.first_A is the end position (excluded) of terminator.
-
-	bool exists_child_of_size_2 = x.first_C - x.first_A >= 2;//size of A >= 2
-
-	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
-		exists_child_of_size_2			// this is a minimum only if A has size >=2
+	if( x.first_C - x.first_A >= 2 and 	// there are at least 2 'A'
+		x.first_C < x.last-1	 		// candidate min in x.first_C is not >= last position
 		){
 
 		LCP_minima[x.first_C] = true;
@@ -690,10 +734,8 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 	}
 
-	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_G - x.first_C >= 2);//size of C >= 2
-
-	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
-		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
+		x.first_G < x.last-1	 		// candidate min in x.first_G is not >= last position
 		){
 
 		LCP_minima[x.first_G] = true;
@@ -701,10 +743,8 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 	}
 
-	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_T - x.first_G >= 2);//size of G >= 2
-
-	if( x.last - x.first_T >= 2 and 	// there are at least 2 'T'
-		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
+	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
+		x.first_T < x.last-1	 		// candidate min in x.first_T is not >= last position
 		){
 
 		LCP_minima[x.first_T] = true;
@@ -713,6 +753,7 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 	}
 
 }
+
 
 int main(int argc, char** argv){
 
@@ -868,6 +909,8 @@ int main(int argc, char** argv){
 
 	LCP_minima = vector<bool>(n,false);
 
+	LCP = vector<uint8_t>(n,0);//TODO debug
+
 	auto TMP_NODES = vector<pair<sa_node, sa_node> >(4);
 
 	uint64_t nodes = 0;//visited ST nodes
@@ -899,7 +942,8 @@ int main(int argc, char** argv){
 		find_leaves(N1, N2, da_values);
 
 		//compute LCP values at the borders of merged's children
-		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
+		//update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
+		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right, LCP);//TODO debug
 
 		update_lcp_minima(merged, n_min);
 
@@ -929,6 +973,31 @@ int main(int argc, char** argv){
 	cout << "Found " << n_min << " LCP minima." << endl;
 	cout << "Max stack depth = " << max_stack << endl;
 	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+
+	//TODO begin debug
+
+	cout << "start checking LCP minima " << endl;
+	for(uint64_t i = 1; i<n-1;++i){
+
+		if(LCP_minima[i]){
+
+			if(not (LCP[i-1] >= LCP[i] and LCP[i+1] > LCP[i])){
+				cout << "Error: LCP_minima=1 but LCP = " << LCP[i-1] << " " << LCP[i] << " " <<  LCP[i+1] << endl;
+			}
+
+		}else{
+
+			if(LCP[i-1] >= LCP[i] and LCP[i+1] > LCP[i]){
+				cout << "Error: LCP_minima=0 but LCP = " << LCP[i-1] << " " << LCP[i] << " " <<  LCP[i+1] << endl;
+			}
+
+		}
+
+	}
+	cout << "Done checking LCP minima " << endl;
+
+	//TODO end debug
+
 
 	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
