@@ -823,8 +823,8 @@ uint8_t number_of_children(pair<sa_node_n,sa_node_n> P){
 
 }
 
-//void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right, vector<uint8_t> & LCP){
-void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right, vector<uint8_t> & LCP){//TODO debug
+void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right){
+//void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right, vector<uint8_t> & LCP){//TODO debug
 
 	assert(x.first_A >= x.first_TERM);
 	assert(x.first_C >= x.first_A);
@@ -836,25 +836,25 @@ void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & 
 	if(has_child_TERM(x) and x.first_A != x.last){
 		LCP_threshold[2*x.first_A] = (x.depth>=K);
 		LCP_threshold[2*x.first_A+1] = (x.depth>=k_right);
-		LCP[x.first_A] = x.depth;//TODO debug
+		//LCP[x.first_A] = x.depth;
 		lcp_values++;
 	}
 	if(has_child_A(x) and x.first_C != x.last){
 		LCP_threshold[2*x.first_C] = (x.depth>=K);
 		LCP_threshold[2*x.first_C+1] = (x.depth>=k_right);
-		LCP[x.first_C] = x.depth;//TODO debug
+		//LCP[x.first_C] = x.depth;
 		lcp_values++;
 	}
 	if(has_child_C(x) and x.first_G != x.last){
 		LCP_threshold[2*x.first_G] = (x.depth>=K);
 		LCP_threshold[2*x.first_G+1] = (x.depth>=k_right);
-		LCP[x.first_G] = x.depth;//TODO debug
+		//LCP[x.first_G] = x.depth;
 		lcp_values++;
 	}
 	if(has_child_G(x) and x.first_T != x.last){
 		LCP_threshold[2*x.first_T] = (x.depth>=K);
 		LCP_threshold[2*x.first_T+1] = (x.depth>=k_right);
-		LCP[x.first_T] = x.depth;//TODO debug
+		//LCP[x.first_T] = x.depth;
 		lcp_values++;
 	}
 

@@ -54,7 +54,7 @@ vector<bool> LCP_minima;
 vector<bool> LCP_threshold;
 vector<bool> DA;
 
-vector<uint8_t> LCP;//TODO: only for debug
+//vector<uint8_t> LCP;
 
 uint64_t n_clust = 0; //number of clusters
 uint64_t n_bases = 0; //number of bases in clusters
@@ -541,7 +541,7 @@ void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
 		LCP_threshold[2*i] = (L1.depth >= K);
 		LCP_threshold[2*i+1] = (L1.depth >= k_right);
 
-		LCP[i] = L1.depth;//TODO debug
+		//LCP[i] = L1.depth;
 
 		lcp_values++;
 
@@ -843,7 +843,7 @@ int main(int argc, char** argv){
 	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
 	 */
 	LCP_threshold = vector<bool>(2*n,false);
-	LCP = vector<uint8_t>(n,0);//TODO debug
+	//LCP = vector<uint8_t>(n,0);
 
 	uint64_t da_values = 0;//number computed DA values
 	uint64_t leaves = 0;//number of visited leaves
@@ -941,8 +941,8 @@ int main(int argc, char** argv){
 		find_leaves(N1, N2, da_values);
 
 		//compute LCP values at the borders of merged's children
-		//update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
-		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right, LCP);//TODO debug
+		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
+		//update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right, LCP);
 
 		update_lcp_minima(merged, n_min);
 
@@ -973,9 +973,7 @@ int main(int argc, char** argv){
 	cout << "Max stack depth = " << max_stack << endl;
 	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
 
-	//TODO begin debug
-
-	cout << "start checking LCP minima " << endl;
+	/*cout << "start checking LCP minima " << endl;
 	for(uint64_t i = 1; i<n-1;++i){
 
 		if(LCP_minima[i]){
@@ -993,10 +991,7 @@ int main(int argc, char** argv){
 		}
 
 	}
-	cout << "Done checking LCP minima " << endl;
-
-	//TODO end debug
-
+	cout << "Done checking LCP minima " << endl;*/
 
 	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
