@@ -15,18 +15,17 @@ using namespace std;
 
 void help(){
 
-	cout << "filter_snp calls.snp m M" << endl << endl <<
-	"Input: a .snp file. Filters out only pairs with at least coverage m and at most M (in both variants). Output to stdout." << endl;
+	cout << "filter_snp calls.snp m" << endl << endl <<
+	"Input: a .snp file. Keep only events with at least coverage m (in both variants). Output to stdout." << endl;
 	exit(0);
 }
 
 int main(int argc, char** argv){
 
-	if(argc != 4) help();
+	if(argc != 3) help();
 
 	string infile = argv[1];
 	int m = atoi(argv[2]);
-	int M = atoi(argv[3]);
 
 	ifstream is(infile);
 
@@ -101,7 +100,7 @@ int main(int argc, char** argv){
 
 			line4 = str;
 
-			if(atoi(cov0.c_str())>=m and atoi(cov1.c_str())>=m and atoi(cov0.c_str())<=M and atoi(cov1.c_str())<=M){
+			if(atoi(cov0.c_str())>=m and atoi(cov1.c_str())>=m){
 
 				cout << line1 << endl << line2 << endl << line3 << endl << line4 << endl;
 
