@@ -86,6 +86,12 @@ void help(){
 	exit(0);
 }
 
+bool file_exists(string fileName)
+{
+    std::ifstream infile(fileName);
+    return infile.good();
+}
+
 /*
  * a pair of DNA segment (this time encoded as strings) containing a potential variant between the
  * two individuals.
@@ -816,6 +822,16 @@ int main(int argc, char** argv){
 	mcov_out = mcov_out==0?mcov_out_def:mcov_out;
 
 	if(input1.compare("")==0 or input2.compare("")==0 or output.compare("")==0) help();
+
+	if(not file_exists(input1)){
+		cout << "Error: could not find file " << input1 << endl << endl;
+		help();
+	}
+
+	if(not file_exists(input2)){
+		cout << "Error: could not find file " << input2 << endl << endl;
+		help();
+	}
 
 	cout << "This is ebwt2snp, version 2." << endl <<
 			"Input eBWT files : " << input1 << " and " << input2 << endl <<
