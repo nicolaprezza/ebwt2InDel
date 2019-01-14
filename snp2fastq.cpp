@@ -50,7 +50,7 @@ int main(int argc, char** argv){
 	string str;
 	unsigned int idx=0;
 
-	string header;
+	string header1, header2, header3;
 	string dna;
 
 	string event_type;
@@ -94,8 +94,8 @@ int main(int argc, char** argv){
 
 			getline(iss_bar, cov0, '|');
 
-			header = event_type;
-			header += "_" + event_number + "_" + snp_pos + "_" + event + "_" + cov0;
+			header1 = event_type;
+			header1 += "_" + event_number + "_" + snp_pos + "_" + event + "_" + cov0;
 
 
 		}
@@ -119,7 +119,7 @@ int main(int argc, char** argv){
 			getline(iss_bar, cov1, '|');
 			getline(iss_bar, cov1, '|');
 
-			header += "_" + cov1 + "_";
+			header2 = "_" + cov1 + "_";
 
 		}
 
@@ -128,14 +128,14 @@ int main(int argc, char** argv){
 			//if switch is false, this is activated on line number 3 (DNA second indiv)
 			//if switch is true, this is activated on line number 1 (DNA first indiv)
 
-			header += str;
+			header3 = str;
 
 		}
 
 		if(idx%4==3){
 
 			//now output fastq entry
-			of 	<< "@" << header << endl <<
+			of 	<< "@" << header1 << header2 << header3 << endl <<
 			dna << endl <<
 			"+" << endl <<
 			string(dna.length(),'I') << endl;
