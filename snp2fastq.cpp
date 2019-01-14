@@ -130,15 +130,18 @@ int main(int argc, char** argv){
 
 			header += str;
 
+		}
+
+		if(idx%4==3){
+
 			//now output fastq entry
 			of 	<< "@" << header << endl <<
 			dna << endl <<
 			"+" << endl <<
 			string(dna.length(),'I') << endl;
 
-
-
 		}
+
 
 		idx++;
 
