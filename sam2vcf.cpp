@@ -283,6 +283,9 @@ int main(int argc, char** argv){
 
 					if(REF.length()>0){
 
+						assert(snp_pos<REF_dna.size());
+						assert(snp_pos<ALT_dna.size());
+
 						v = {
 										chr,
 										pos + snp_pos,
@@ -295,6 +298,9 @@ int main(int argc, char** argv){
 						};
 
 					}else{
+
+						assert(snp_pos<REF_dna.size());
+						assert(snp_pos<ALT_dna.size());
 
 						v = {
 										chr,
@@ -356,6 +362,9 @@ int main(int argc, char** argv){
 
 									if(REF_dna[snp_pos_ref+i] != ALT_dna[snp_pos_alt+i]){
 
+										assert(snp_pos_ref+i<REF_dna.size());
+										assert(snp_pos_alt+i<ALT_dna.size());
+
 										vcf_entry v  = {
 															chr,
 															pos + i,
@@ -380,6 +389,9 @@ int main(int argc, char** argv){
 								for(int i=0;i<snp_pos;++i){
 
 									if(REF_dna[i] != ALT_dna[i]){
+
+										assert(i<REF_dna.size());
+										assert(i<ALT_dna.size());
 
 										vcf_entry v  = {
 															chr,
