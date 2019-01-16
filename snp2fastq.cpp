@@ -92,6 +92,18 @@ int main(int argc, char** argv){
 
 			}
 
+			{
+
+				std::istringstream iss_slash(event);
+				string hapl1;
+				string hapl2;
+				getline(iss_slash, hapl1, '/');
+				getline(iss_slash, hapl2, '/');
+
+				if(switch_) event = hapl2 + "/" + hapl1;
+
+			}
+
 			getline(iss_bar, cov0, '|');
 
 			header1 = event_type;
