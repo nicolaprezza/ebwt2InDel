@@ -54,7 +54,26 @@ cd ../../egap
 make
 ~~~~
 
-### Run
+### Run - one sample
+
+Enter the folder with the fasta file _reads.fasta_ . We assume that executables 'eGap', 'ebwt2snp' are global. 
+
+~~~~
+#Step 1: optional, but considerably increases sensitivity of the tool. Insert in reads.fasta also the reverse-complement of the reads.
+
+#Build the BWT of the sets of reads
+eGap reads.fasta
+
+#Call SNPs (do this in the same folder containing all other files)
+ebwt2snp -1 reads.fasta.bwt -o output.snp -t 0
+
+#File output.snp.fasta now contains identified SNPs/indels.
+#note: in the read name of each outputted DNA fragment, the field cov: indicates the coverage of the event. You can use this to filter the file and improve accuracy. 
+
+~~~~
+
+
+### Run - two samples
 
 Enter the folder with the two fasta files _reads1.fasta_  and _reads2.fasta_ (i.e. the reads of the two samples). We assume that executables 'eGap', 'ebwt2snp' are global. 
 
@@ -68,7 +87,7 @@ eGap reads2.fasta
 #Call SNPs (do this in the same folder containing all other files)
 ebwt2snp -1 reads1.fasta.bwt -2 reads1.fasta.bwt -o output.snp -t 0
 
-#File ALL.snp.fasta now contains identified SNPs/indels. Note: the third field between "|" in the read-names of this file indicates the number of times the variant is observed (maximum value specified with option -m in ebwt2snp). You can further filter this file according to this field in order to improve accuracy. For this, use executable filter_snp:
+#File output.snp.fasta now contains identified SNPs/indels. Note: the third field between "|" in the read-names of this file indicates the number of times the variant is observed (maximum value specified with option -m in ebwt2snp). You can further filter this file according to this field in order to improve accuracy. For this, use executable filter_snp:
 
 #Filter only events supported by at least 5
 filter_snp output.snp 5 > output.5.snp

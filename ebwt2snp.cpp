@@ -111,6 +111,19 @@ struct variant_t{
 
 };
 
+struct variant_single_t{
+
+	//left contexts are of length k_left. Note: the variant is located at the end of the left context.
+	//in the case of SNP, it is in the last letter of the left context.
+
+	string left_context;
+
+	string right_context;
+
+	int support;
+
+};
+
 /*
  * Hamming distance on strings. If length is different, align them on the right and discard extra chars on left.
  */
@@ -389,6 +402,77 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 }
 
 /*
+ * input: bwt and range of cluster (right-excluded)
+ *
+ * output: the variants found in the cluster
+ */
+vector<variant_single_t> find_variants(dna_bwt_t & bwt, range_t range){
+
+	vector<variant_single_t>  out;
+
+	auto counts = vector<unsigned int>(4,0);
+
+	uint64_t max_lcp_val = 0;//value of max LCP in cluster
+	uint64_t max_lcp_read_idx = 0;//index of read with max LCP in cluster
+	uint64_t max_lcp_read_pos = 0;//position in read where max LCP starts
+
+	for(uint64_t i=range.first;i<range.second;++i) counts[base_to_int(bwt[i])]++;
+
+	//compute the lists of frequent characters
+	vector<unsigned char> frequent_char;
+
+	for(int c=0;c<4;++c){
+
+		if(counts[c] >= mcov_out) frequent_char.push_back(int_to_base(c));
+
+	}
+
+	//all variations observed in cluster
+
+	//filter: remove clusters that cannot reflect a variation
+	if(	frequent_char.size()<2 ) return out;
+
+	//for each frequent char in each of the two individuals, find the associated
+	//left-context and corresponding coverage using backward search
+
+	vector<pair<string, int> > left_contexts;
+
+	for(auto c : frequent_char) extract_consensus(bwt, range, c, left_contexts, k_left);
+
+	//find right-context
+
+	string right_ctx = "";
+
+	uint64_t i = range.first;
+
+	//find i such that LCP[i] >= k_right
+	while(i<range.second and (not LCP_threshold[2*i+1])) ++i;
+
+	//found good right context
+	if(i<range.second and LCP_threshold[2*i+1]){
+
+		right_ctx = extract_dna(bwt, i, k_right);
+		assert(right_ctx.length() == k_right);
+
+		//store all variants found
+		for(auto L : left_contexts){
+
+			if(L.first.size()>0){
+
+				out.push_back({L.first,right_ctx,L.second});
+
+			}
+
+		}
+
+	}
+
+	return out;
+
+}
+
+
+/*
  * detect the type of variant (SNP/indel/discard if none) and, if not discarded, output to file the two reads per variant testifying it.
  */
 void to_file(vector<variant_t> & output_variants, ofstream & out_file){
@@ -521,6 +605,50 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 }
 
+void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
+
+	if(output_variants.size()<2) return;
+
+	int max_dist = 0;
+
+	for(int i=0;i<output_variants.size()-1;++i){
+
+		auto d = distance(output_variants[i].left_context,output_variants[i+1].left_context);
+
+		max_dist = d.first>max_dist?d.first:max_dist;
+
+	}
+
+	if(max_dist <= max_snvs){
+
+		for(auto v:output_variants){
+
+			string ID = ">";
+
+			ID.append("id:");
+			ID.append(to_string(id_nr));
+			ID.append("_pos:");
+			ID.append(to_string(v.right_context.size()));
+			ID.append("_cov:");
+			ID.append(std::to_string(v.support));//we write the number of reads supporting this variant
+
+			out_file << ID << endl;
+
+			string DNA;
+			DNA = v.left_context;
+			DNA.append(v.right_context);
+
+			out_file << DNA << endl;
+
+			id_nr++;
+
+		}
+
+	}
+
+}
+
+
 void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
 
 	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
@@ -547,6 +675,19 @@ void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
 		LCP_threshold[2*i+1] = (L1.depth >= k_right);
 
 		//LCP[i] = L1.depth;
+
+		lcp_values++;
+
+	}
+
+}
+
+void update_LCP_leaf(sa_leaf L, uint64_t & lcp_values){
+
+	for(uint64_t i = L.rn.first+1; i<L.rn.second; ++i){
+
+		LCP_threshold[2*i] = (L.depth >= K);
+		LCP_threshold[2*i+1] = (L.depth >= k_right);
 
 		lcp_values++;
 
@@ -679,50 +820,6 @@ void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, 
 
 }
 
-//void update_lcp_minima(sa_node x, uint64_t & n_min){
-//
-///*
-// * we have a minimum at the beginning of each child of size at least 2 of the input node, except
-// * the first child after child # (if present) or first child (if # not present)
-// */
-//
-//	//x.first_A is the end position (excluded) of terminator.
-//
-//	bool exists_child_of_size_2 = x.first_C - x.first_A >= 2;//size of A >= 2
-//
-//	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
-//		exists_child_of_size_2			// this is a minimum only if A has size >=2
-//		){
-//
-//		LCP_minima[x.first_C] = true;
-//		n_min++;
-//
-//	}
-//
-//	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_G - x.first_C >= 2);//size of C >= 2
-//
-//	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
-//		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
-//		){
-//
-//		LCP_minima[x.first_G] = true;
-//		n_min++;
-//
-//	}
-//
-//	exists_child_of_size_2 = exists_child_of_size_2 or (x.first_T - x.first_G >= 2);//size of G >= 2
-//
-//	if( x.last - x.first_T >= 2 and 	// there are at least 2 'T'
-//		exists_child_of_size_2			// this is a minimum only if there is a previous child of size >=2
-//		){
-//
-//		LCP_minima[x.first_T] = true;
-//		n_min++;
-//
-//	}
-//
-//}
-
 void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 /*
@@ -759,98 +856,7 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 }
 
-
-int main(int argc, char** argv){
-
-	srand(time(NULL));
-
-	if(argc < 3) help();
-
-	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:D")) != -1){
-		switch (opt){
-			case 'h':
-				help();
-			break;
-			case 'b':
-				bcr = true;
-			break;
-			case '1':
-				input1 = string(optarg);
-			break;
-			case 'o':
-				output = string(optarg);
-			break;
-			case '2':
-				input2 = string(optarg);
-			break;
-			case 'm':
-				mcov_out = atoi(optarg);
-			break;
-			case 'k':
-				K = atoi(optarg);
-			break;
-			case 'g':
-				max_gap = atoi(optarg);
-			break;
-			case 'L':
-				k_left = atoi(optarg);
-			break;
-			case 'R':
-				k_right = atoi(optarg);
-			break;
-			case 'v':
-				max_snvs = atoi(optarg);
-			break;
-			case 't':
-				TERM = atoi(optarg);
-			break;
-			case 'D':
-				diploid = true;
-			break;
-			default:
-				help();
-			return -1;
-		}
-	}
-
-	K = K == 0 ? K_def : K;
-	max_gap = max_gap==0?max_gap_def:max_gap;
-	k_left = k_left==0?k_left_def:k_left;
-	k_right = k_right==0?k_right_def:k_right;
-	max_snvs = max_snvs==0?max_snvs_def:max_snvs;
-	mcov_out = mcov_out==0?mcov_out_def:mcov_out;
-
-	if(input1.compare("")==0 or input2.compare("")==0 or output.compare("")==0) help();
-
-	if(not file_exists(input1)){
-		cout << "Error: could not find file " << input1 << endl << endl;
-		help();
-	}
-
-	if(not file_exists(input2)){
-		cout << "Error: could not find file " << input2 << endl << endl;
-		help();
-	}
-
-	cout << "This is ebwt2snp, version 2." << endl <<
-			"Input eBWT files : " << input1 << " and " << input2 << endl <<
-			"Left-extending eBWT ranges by " << k_left << " bases." << endl <<
-			"Right context length: " << k_right << " bases." << endl <<
-			"Storing output events to file " << output << endl <<
-			"Minimum coverage of output events: " << mcov_out << endl;
-
-	if(diploid){
-
-		cout << "Diploid samples." << endl;
-
-	}else{
-
-		cout << "Haploid samples." << endl;
-
-	}
-
-	cout << endl;
+void run_two_datasets(){
 
 	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
 
@@ -1111,6 +1117,334 @@ int main(int argc, char** argv){
 		cout << i << ( i < 10 ? "   " : (i<100 ? "  " : " "));
 		for(uint64_t j = 0; j < (100*CLUST_SIZES[i])/scale; ++j) cout << "-";
 		cout << " " << CLUST_SIZES[i] << endl;
+
+	}
+
+
+}
+
+
+void run_one_dataset(){
+
+	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
+
+	dna_bwt_t bwt = dna_bwt_t(input1,TERM);
+
+	cout << "done." << endl;
+
+	uint64_t n = bwt.size();
+
+	cout << "\nPhase 2/4: navigating suffix tree leaves." << endl;
+
+	/*
+	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
+	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
+	 */
+	LCP_threshold = vector<bool>(2*n,false);
+
+	uint64_t leaves = 0;//number of visited leaves
+	uint64_t max_stack = 0;
+	uint64_t lcp_values = 1;//number of computed LCP values
+
+	{
+
+		auto TMP_LEAVES = vector<sa_leaf>(4);
+
+		stack<sa_leaf> S;
+		S.push(bwt.first_leaf());
+
+		int last_perc_lcp = -1;
+		int last_perc_da = -1;
+		int perc_lcp = 0;
+		int perc_da = 0;
+
+		while(not S.empty()){
+
+			sa_leaf L = S.top();
+			S.pop();
+			leaves++;
+
+			assert(leaf_size(L)>0);
+			max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+			update_LCP_leaf(L,lcp_values);
+
+			int t = 0;//number of children leaves
+			bwt.next_leaves(L, TMP_LEAVES, t, 2);
+
+			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
+
+			perc_lcp = (100*lcp_values)/n;
+
+			if(perc_da > last_perc_da){
+
+				cout << "DA: " << perc_da << "%. ";
+				cout << "LCP: " << perc_lcp << "%.";
+				cout << endl;
+
+				last_perc_lcp = perc_lcp;
+				last_perc_da = perc_da;
+
+			}
+
+		}
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
+
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
+
+	cout << "Phase 3/4: computing LCP minima." << endl;
+
+	LCP_minima = vector<bool>(n,false);
+
+	auto TMP_NODES = vector<sa_node>(4);
+
+	uint64_t nodes = 0;//visited ST nodes
+	max_stack = 0;
+
+	stack<sa_node> S;
+	S.push(bwt.root());
+
+	int last_perc_lcp = -1;
+	int perc_lcp = 0;
+	uint64_t n_min = 0;//number of LCP minima
+
+	while(not S.empty()){
+
+		max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+		sa_node N = S.top();
+		S.pop();
+		nodes++;
+
+		//compute LCP values at the borders of N's children
+		update_lcp_threshold(N, LCP_threshold, lcp_values, K, k_right);
+
+		update_lcp_minima(N, n_min);
+
+		//follow Weiner links
+		int t = 0;
+		bwt.next_nodes(N, TMP_NODES, t);
+
+		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
+
+		perc_lcp = (100*lcp_values)/n;
+
+		if(perc_lcp > last_perc_lcp){
+
+			cout << "LCP: " << perc_lcp << "%.";
+			cout << endl;
+
+			last_perc_lcp = perc_lcp;
+
+		}
+
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
+	cout << "Found " << n_min << " LCP minima." << endl;
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+
+	cout << "Phase 4/4: detecting SNPs and indels." << endl;
+
+	cout << "Output events will be stored in " << output << endl;
+	ofstream out_file = ofstream(output);
+
+	uint64_t begin = 0;//begin position
+
+	uint64_t clust_len=0;
+	bool cluster_open=false;
+
+	int perc = -1;
+	int last_perc = -1;
+
+	uint64_t n_clusters = 0; //number of clusters analyzed
+	uint64_t clust_size = 0; //cumulative cluster size
+
+	uint64_t MAX_CLUST_LEN = 200;
+	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
+
+	for(uint64_t i=0;i<n;++i){
+
+		if(LCP_threshold[2*i] and not LCP_minima[i]){
+
+			if(cluster_open){//extend current cluster
+				clust_len++;
+			}else{//open new cluster
+				cluster_open=true;
+				clust_len=1;
+				begin=i;
+			}
+
+		}else{
+
+			if(cluster_open){//close current cluster
+
+				clust_size += clust_len;
+
+				if(clust_len<=MAX_CLUST_LEN) CLUST_SIZES[clust_len]+=clust_len;
+
+				if(clust_len>=2*mcov_out){
+
+					n_clusters++;
+					vector<variant_single_t> var = find_variants(bwt, {begin,i});
+					to_file(var,out_file);
+
+				}
+
+			}
+
+			cluster_open=false;
+			clust_len = 0;
+
+		}
+
+		perc = (100*i)/n;
+
+		if(perc > last_perc){
+
+			cout << perc << "%. ";
+			cout << endl;
+
+			last_perc = perc;
+
+		}
+
+	}
+
+	cout 	<< endl << "Done." << endl <<
+			"Analyzed " << n_clusters << " clusters." << endl <<
+			"Average cluster length: " << double(clust_size)/n_clusters << "." << endl << endl <<
+			"Distribution of bases inside clusters (cluster length / number of bases inside clusters of that length): " << endl << endl;
+
+
+
+	uint64_t scale = *max_element(CLUST_SIZES.begin(), CLUST_SIZES.end());
+
+	for(int i=0;i<=MAX_CLUST_LEN;++i){
+
+		cout << i << ( i < 10 ? "   " : (i<100 ? "  " : " "));
+		for(uint64_t j = 0; j < (100*CLUST_SIZES[i])/scale; ++j) cout << "-";
+		cout << " " << CLUST_SIZES[i] << endl;
+
+	}
+
+
+}
+
+
+int main(int argc, char** argv){
+
+	srand(time(NULL));
+
+	if(argc < 3) help();
+
+	int opt;
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:D")) != -1){
+		switch (opt){
+			case 'h':
+				help();
+			break;
+			case 'b':
+				bcr = true;
+			break;
+			case '1':
+				input1 = string(optarg);
+			break;
+			case 'o':
+				output = string(optarg);
+			break;
+			case '2':
+				input2 = string(optarg);
+			break;
+			case 'm':
+				mcov_out = atoi(optarg);
+			break;
+			case 'k':
+				K = atoi(optarg);
+			break;
+			case 'g':
+				max_gap = atoi(optarg);
+			break;
+			case 'L':
+				k_left = atoi(optarg);
+			break;
+			case 'R':
+				k_right = atoi(optarg);
+			break;
+			case 'v':
+				max_snvs = atoi(optarg);
+			break;
+			case 't':
+				TERM = atoi(optarg);
+			break;
+			case 'D':
+				diploid = true;
+			break;
+			default:
+				help();
+			return -1;
+		}
+	}
+
+	K = K == 0 ? K_def : K;
+	max_gap = max_gap==0?max_gap_def:max_gap;
+	k_left = k_left==0?k_left_def:k_left;
+	k_right = k_right==0?k_right_def:k_right;
+	max_snvs = max_snvs==0?max_snvs_def:max_snvs;
+	mcov_out = mcov_out==0?mcov_out_def:mcov_out;
+
+	if(input1.compare("")==0 or output.compare("")==0) help();
+
+	if(not file_exists(input1)){
+		cout << "Error: could not find file " << input1 << endl << endl;
+		help();
+	}
+
+	if(input2.length() > 0 and not file_exists(input2)){
+		cout << "Error: could not find file " << input2 << endl << endl;
+		help();
+	}
+
+	cout << "This is ebwt2snp, version 2." << endl;
+
+	if(input2.length()>0){
+
+		cout << "Running on two samples. Input eBWT files : " << input1 << " and " << input2 << endl;
+
+	}else{
+
+		cout << "Running on one sample. Input eBWT file : " << input1 << endl;
+
+	}
+
+	cout << "Left-extending eBWT ranges by " << k_left << " bases." << endl <<
+	"Right context length: " << k_right << " bases." << endl <<
+	"Storing output events to file " << output << endl <<
+	"Minimum coverage of output events: " << mcov_out << endl;
+
+	if(diploid){
+
+		cout << "Input: Diploid." << endl;
+
+	}else{
+
+		cout << "Input: Haploid." << endl;
+
+	}
+
+	cout << endl;
+
+	if(input2.length()>0){
+
+		run_two_datasets();
+
+	}else{
+
+		run_one_dataset();
 
 	}
 
