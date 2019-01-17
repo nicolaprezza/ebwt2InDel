@@ -1155,9 +1155,7 @@ void run_one_dataset(){
 		S.push(bwt.first_leaf());
 
 		int last_perc_lcp = -1;
-		int last_perc_da = -1;
 		int perc_lcp = 0;
-		int perc_da = 0;
 
 		while(not S.empty()){
 
@@ -1177,14 +1175,12 @@ void run_one_dataset(){
 
 			perc_lcp = (100*lcp_values)/n;
 
-			if(perc_da > last_perc_da){
+			if(perc_lcp > last_perc_lcp){
 
-				cout << "DA: " << perc_da << "%. ";
 				cout << "LCP: " << perc_lcp << "%.";
 				cout << endl;
 
 				last_perc_lcp = perc_lcp;
-				last_perc_da = perc_da;
 
 			}
 
@@ -1418,7 +1414,7 @@ int main(int argc, char** argv){
 
 	}else{
 
-		cout << "Running on one sample. Input eBWT file : " << input1 << endl;
+		cout << "Running on one sample (genotyping). Input eBWT file : " << input1 << endl;
 
 	}
 
