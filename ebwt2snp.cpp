@@ -66,8 +66,9 @@ void help(){
 	cout << "ebwt2snp [options]" << endl <<
 	"Options:" << endl <<
 	"-h          Print this help." << endl <<
-	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first individual (REQUIRED)." << endl <<
-	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second individual (REQUIRED)." << endl <<
+	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first reads set (REQUIRED)." << endl <<
+	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second reads set. If not specified, perform genotyping of first reads set." << endl <<
+	"            If specified, find differences (SNPs/indels) between the two reads sets." << endl <<
 	"-o <arg>    Output .snp file (REQUIRED)." << endl <<
 	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
 	"-R <arg>    Length of right context, SNP excluded (default: " << k_right_def << ")." << endl <<
