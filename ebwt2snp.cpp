@@ -83,8 +83,7 @@ void help(){
 
 	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
 
-	"Output format:  SNPs are output in KisSNP2 format as a fasta file. NOTE: in many cases, each SNP/indel is" << endl <<
-	"reported twice: one time on the forward strand and one on the reverse strand. " << endl;
+	"Output format: A fasta file with DNA fragments containing the variations." << endl;
 
 	exit(0);
 }
@@ -346,7 +345,7 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	}
 
-	std::sort(frequent_char_0.begin(), frequent_char_0.end());
+	/*std::sort(frequent_char_0.begin(), frequent_char_0.end());
 	std::sort(frequent_char_1.begin(), frequent_char_1.end());
 
 	//all variations observed in cluster
@@ -356,7 +355,7 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
 
 	//filter: remove clusters that cannot reflect a variation
-	/*if(	frequent_char_0.size()==0 or // not covered enough
+	if(	frequent_char_0.size()==0 or // not covered enough
 		frequent_char_1.size()==0 or // not covered enough
 		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
 		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
