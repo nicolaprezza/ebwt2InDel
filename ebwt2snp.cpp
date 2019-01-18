@@ -48,6 +48,8 @@ int K = 0;
 
 char TERM = '#';
 
+uint64_t cluster_nr = 1;//cluster number while outputting to file
+
 const uint64_t MAX_READ_LEN = 100000;
 
 vector<bool> LCP_minima;
@@ -56,8 +58,8 @@ vector<bool> DA;
 
 //vector<uint8_t> LCP;
 
-uint64_t n_clust = 0; //number of clusters
 uint64_t n_bases = 0; //number of bases in clusters
+uint64_t events = 0;//number of outputted events
 
 uint64_t id_nr = 1;
 
@@ -76,7 +78,7 @@ void help(){
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
 	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
-	"-D          Samples are diploid (default: haploid)." <<  endl <<
+	"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
@@ -611,6 +613,7 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 	if(output_variants.size()<2) return;
 
 	int max_dist = 0;
+	int nr_covered = 0;//number of covered-enough events in cluster
 
 	for(int i=0;i<output_variants.size()-1;++i){
 
@@ -618,32 +621,47 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 		max_dist = d.first>max_dist?d.first:max_dist;
 
+		nr_covered += output_variants[i].support >= mcov_out;
+
 	}
 
-	if(max_dist <= max_snvs){
+	nr_covered += output_variants[output_variants.size()-1].support >= mcov_out;
+
+	if(max_dist <= max_snvs and nr_covered >= 2){
+
+		id_nr = 1;
 
 		for(auto v:output_variants){
 
-			string ID = ">";
+			if(v.support >= mcov_out){
 
-			ID.append("id:");
-			ID.append(to_string(id_nr));
-			ID.append("_pos:");
-			ID.append(to_string(v.right_context.size()));
-			ID.append("_cov:");
-			ID.append(std::to_string(v.support));//we write the number of reads supporting this variant
+				string ID = ">";
 
-			out_file << ID << endl;
+				ID.append("cluster:");
+				ID.append(to_string(cluster_nr));
+				ID.append("_id:");
+				ID.append(to_string(id_nr));
+				ID.append("_pos:");
+				ID.append(to_string(v.right_context.size()));
+				ID.append("_cov:");
+				ID.append(std::to_string(v.support));//we write the number of reads supporting this variant
 
-			string DNA;
-			DNA = v.left_context;
-			DNA.append(v.right_context);
+				out_file << ID << endl;
 
-			out_file << DNA << endl;
+				string DNA;
+				DNA = v.left_context;
+				DNA.append(v.right_context);
 
-			id_nr++;
+				out_file << DNA << endl;
+
+				id_nr++;
+				events++;
+
+			}
 
 		}
+
+		cluster_nr ++;
 
 	}
 
@@ -1329,6 +1347,7 @@ void run_one_dataset(){
 
 	}
 
+	cout << "\nStored to file " << events << " events clustered in " << (cluster_nr-1) << " clusters." << endl;
 
 }
 
