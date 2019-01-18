@@ -230,7 +230,6 @@ pair<char,range_t> consensus_letter(p_range pr){
 	   return range_length(lhs.second) > range_length(rhs.second);
 	});
 
-	//if(range_length(freqs[0].second) < mcov_out) return {0,{0,0}};
 	if(range_length(freqs[0].second) == 0) return {0,{0,0}};
 
 	return freqs[0];
@@ -259,7 +258,7 @@ void extract_consensus(dna_bwt_t & bwt, range_t R,string & ctx, int & freq, int 
 }
 
 //extract len characters using backward search, starting from position in range containing character c
-void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
+/*void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
 
 	string ctx;
 	ctx += c;
@@ -269,6 +268,25 @@ void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<strin
 	int freq = 0;
 
 	extract_consensus(bwt, R,ctx,freq,len-1);
+
+	reverse(ctx.begin(), ctx.end());
+
+	if(ctx.size()==len) left_contexts.push_back({ctx,freq});
+
+}*/
+
+//extract len characters using backward search, starting from position in range containing character c
+void extract_consensus(dna_bwt_t & bwt, range_t range, char c, vector<pair<string, int> > & left_contexts, int len){
+
+	string ctx;
+	ctx += c;
+
+	range_t R = bwt.LF(range,c);
+
+	int freq = range_length(R);
+	int covg = 0;
+
+	extract_consensus(bwt, R,ctx,covg,len-1);
 
 	reverse(ctx.begin(), ctx.end());
 
@@ -338,17 +356,17 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
 
 	//filter: remove clusters that cannot reflect a variation
-	if(	frequent_char_0.size()==0 or // not covered enough
+	/*if(	frequent_char_0.size()==0 or // not covered enough
 		frequent_char_1.size()==0 or // not covered enough
 		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
 		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_0 == frequent_char_1 or 			// same alleles: probably both heterozigous / multiple region (and no variants)
-		all_chars.size() > 2							// too many distinct frequent characters in the cluster (probably multiple region)
+		frequent_char_0 == frequent_char_1 or  			// same alleles: probably both heterozigous / multiple region (and no variants)
+		all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
 		return out;
 
-	}
+	}*/
 
 	//for each frequent char in each of the two individuals, find the associated
 	//left-context and corresponding coverage using backward search
