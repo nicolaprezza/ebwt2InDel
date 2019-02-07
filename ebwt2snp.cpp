@@ -72,7 +72,7 @@ void help(){
 	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first reads set (REQUIRED)." << endl <<
 	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second reads set. If not specified, perform genotyping of first reads set." << endl <<
 	"            If specified, find differences (SNPs/indels) between the two reads sets." << endl <<
-	"-d          Input Document Array. If option -2 is not specified, this file specifies which characters from the input bwt" << endl <<
+	"-d <arg>    Input Document Array. If option -2 is not specified, this file specifies which characters from the input bwt" << endl <<
 	"            belong to the first (0) and which from the second (1) individual. Format: ASCII file filled with '0' and '1'." << endl <<
 	"-o <arg>    Output .snp file (REQUIRED)." << endl <<
 	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
