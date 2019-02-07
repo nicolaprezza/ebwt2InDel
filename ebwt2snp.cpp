@@ -35,6 +35,7 @@ int max_gap_def = 10;
 
 string input1;
 string input2;
+string input_da;//document array
 string output;
 
 bool bcr = false;
@@ -71,6 +72,8 @@ void help(){
 	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first reads set (REQUIRED)." << endl <<
 	"-2 <arg>    Input eBWT file (A,C,G,T,#) of second reads set. If not specified, perform genotyping of first reads set." << endl <<
 	"            If specified, find differences (SNPs/indels) between the two reads sets." << endl <<
+	"-d          Input Document Array. If option -2 is not specified, this file specifies which characters from the input bwt" << endl <<
+	"            belong to the first (0) and which from the second (1) individual. Format: ASCII file filled with '0' and '1'." << endl <<
 	"-o <arg>    Output .snp file (REQUIRED)." << endl <<
 	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
 	"-R <arg>    Length of right context, SNP excluded (default: " << k_right_def << ")." << endl <<
@@ -327,10 +330,6 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	auto counts = vector<vector<unsigned int> >(2,vector<unsigned int>(4,0));
 
-	uint64_t max_lcp_val = 0;//value of max LCP in cluster
-	uint64_t max_lcp_read_idx = 0;//index of read with max LCP in cluster
-	uint64_t max_lcp_read_pos = 0;//position in read where max LCP starts
-
 	for(uint64_t i=range1.first;i<range1.second;++i) counts[0][base_to_int(bwt1[i])]++;
 	for(uint64_t i=range2.first;i<range2.second;++i) counts[1][base_to_int(bwt2[i])]++;
 
@@ -432,10 +431,6 @@ vector<variant_single_t> find_variants(dna_bwt_t & bwt, range_t range){
 
 	auto counts = vector<unsigned int>(4,0);
 
-	uint64_t max_lcp_val = 0;//value of max LCP in cluster
-	uint64_t max_lcp_read_idx = 0;//index of read with max LCP in cluster
-	uint64_t max_lcp_read_pos = 0;//position in read where max LCP starts
-
 	for(uint64_t i=range.first;i<range.second;++i) counts[base_to_int(bwt[i])]++;
 
 	//compute the lists of frequent characters
@@ -490,6 +485,76 @@ vector<variant_single_t> find_variants(dna_bwt_t & bwt, range_t range){
 	return out;
 
 }
+
+
+/*
+ * input: bwt and range of cluster (right-excluded)
+ *
+ * output: the variants found in the cluster
+ */
+vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t range){
+
+	vector<variant_t>  out;
+
+	auto counts = vector<vector<unsigned int> >(2,vector<unsigned int>(4,0));
+
+	for(uint64_t i=range.first;i<range.second;++i) counts[DA[i]][base_to_int(bwt[i])]++;
+
+	//compute the lists of frequent characters in indiv 0 and 1
+	vector<unsigned char> frequent_char_0;
+	vector<unsigned char> frequent_char_1;
+
+	for(int c=0;c<4;++c){
+
+		if(counts[0][c] >= mcov_out) frequent_char_0.push_back(int_to_base(c));
+		if(counts[1][c] >= mcov_out) frequent_char_1.push_back(int_to_base(c));
+
+	}
+
+	vector<pair<string, int> > left_contexts_0;
+	vector<pair<string, int> > left_contexts_1;
+
+	for(auto c : frequent_char_0) extract_consensus(bwt, range, c, left_contexts_0, k_left);
+	for(auto c : frequent_char_1) extract_consensus(bwt, range, c, left_contexts_1, k_left);
+
+	//find right-context
+
+	string right_ctx = "";
+
+	//first position in ranges and merged range (i)
+	uint64_t i = range.first;
+
+	//find i such that LCP[i] >= k_right
+	while(i<range.second and (not LCP_threshold[2*i+1])) ++i;
+
+	//found good right context
+	if(i<range.second and LCP_threshold[2*i+1]){
+
+		right_ctx = extract_dna(bwt, i, k_right);
+		assert(right_ctx.length() == k_right);
+
+		//store all variants found
+		for(auto L0 : left_contexts_0){
+
+			for(auto L1 : left_contexts_1){
+
+				if(L0.first.size()>0 and L1.first.size()>0){
+
+					if(L0.first[L0.first.size()-1] != L1.first[L1.first.size()-1])
+						out.push_back({L0.first,L1.first,right_ctx,L0.second, L1.second});
+
+				}
+
+			}
+
+		}
+
+	}
+
+	return out;
+
+}
+
 
 
 /*
@@ -892,6 +957,9 @@ void update_lcp_minima(sa_node x, uint64_t & n_min){
 
 }
 
+/*
+ * input: two BWTs
+ */
 void run_two_datasets(){
 
 	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
@@ -1160,6 +1228,232 @@ void run_two_datasets(){
 }
 
 
+/*
+ * input: BWT and DA
+ */
+void run_two_datasets_da(){
+
+	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
+
+	dna_bwt_t bwt = dna_bwt_t(input1,TERM);
+
+	cout << "done." << endl;
+
+	uint64_t n = bwt.size();
+
+	cout << "\nPhase 2/4: navigating suffix tree leaves." << endl;
+
+	/*
+	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
+	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
+	 */
+	LCP_threshold = vector<bool>(2*n,false);
+
+	uint64_t leaves = 0;//number of visited leaves
+	uint64_t max_stack = 0;
+	uint64_t lcp_values = 1;//number of computed LCP values
+
+	{
+
+		auto TMP_LEAVES = vector<sa_leaf>(4);
+
+		stack<sa_leaf> S;
+		S.push(bwt.first_leaf());
+
+		int last_perc_lcp = -1;
+		int perc_lcp = 0;
+
+		while(not S.empty()){
+
+			sa_leaf L = S.top();
+			S.pop();
+			leaves++;
+
+			assert(leaf_size(L)>0);
+			max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+			update_LCP_leaf(L,lcp_values);
+
+			int t = 0;//number of children leaves
+			bwt.next_leaves(L, TMP_LEAVES, t, 2);
+
+			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
+
+			perc_lcp = (100*lcp_values)/n;
+
+			if(perc_lcp > last_perc_lcp){
+
+				cout << "LCP: " << perc_lcp << "%.";
+				cout << endl;
+
+				last_perc_lcp = perc_lcp;
+
+			}
+
+		}
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
+
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
+
+	cout << "Phase 3/4: computing LCP minima." << endl;
+
+	LCP_minima = vector<bool>(n,false);
+
+	auto TMP_NODES = vector<sa_node>(4);
+
+	uint64_t nodes = 0;//visited ST nodes
+	max_stack = 0;
+
+	stack<sa_node> S;
+	S.push(bwt.root());
+
+	int last_perc_lcp = -1;
+	int perc_lcp = 0;
+	uint64_t n_min = 0;//number of LCP minima
+
+	while(not S.empty()){
+
+		max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+		sa_node N = S.top();
+		S.pop();
+		nodes++;
+
+		//compute LCP values at the borders of N's children
+		update_lcp_threshold(N, LCP_threshold, lcp_values, K, k_right);
+
+		update_lcp_minima(N, n_min);
+
+		//follow Weiner links
+		int t = 0;
+		bwt.next_nodes(N, TMP_NODES, t);
+
+		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
+
+		perc_lcp = (100*lcp_values)/n;
+
+		if(perc_lcp > last_perc_lcp){
+
+			cout << "LCP: " << perc_lcp << "%.";
+			cout << endl;
+
+			last_perc_lcp = perc_lcp;
+
+		}
+
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
+	cout << "Found " << n_min << " LCP minima." << endl;
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+
+	cout << "Phase 3/4: detecting SNPs and indels." << endl;
+
+	cout << "Output events will be stored in " << output << endl;
+	ofstream out_file = ofstream(output);
+
+	uint64_t begin = 0;//begin position
+
+	uint64_t clust_len=0;
+	bool cluster_open=false;
+
+	int perc = -1;
+	int last_perc = -1;
+
+	uint64_t n_clusters = 0; //number of clusters analyzed
+	uint64_t clust_size = 0; //cumulative cluster size
+
+	uint64_t MAX_CLUST_LEN = 200;
+
+	vector<bool> DA(n,false);
+
+	ifstream da_file(input_da);
+	char x;
+
+	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
+
+	for(uint64_t i=0;i<n;++i){
+
+		//read next boolean DA value
+		da_file.read((char*)&x,1);
+		DA[i] = (x=='1');
+
+		if(LCP_threshold[2*i] and not LCP_minima[i]){
+
+			if(cluster_open){//extend current cluster
+
+				clust_len++;
+
+			}else{//open new cluster
+
+				cluster_open=true;
+				clust_len=1;
+				begin=i;
+
+			}
+
+		}else{
+
+			if(cluster_open){//close current cluster
+
+				clust_size += clust_len;
+
+				if(clust_len<=MAX_CLUST_LEN) CLUST_SIZES[clust_len]+=clust_len;
+
+				if(clust_len>=2*mcov_out){
+
+					n_clusters++;
+					vector<variant_t> var = find_variants(bwt, DA, {begin,i});
+					to_file(var,out_file);
+
+				}
+
+			}
+
+			cluster_open=false;
+			clust_len = 0;
+
+		}
+
+		perc = (100*i)/n;
+
+		if(perc > last_perc){
+
+			cout << perc << "%. ";
+			cout << endl;
+
+			last_perc = perc;
+
+		}
+
+	}
+
+	cout 	<< endl << "Done." << endl <<
+			"Analyzed " << n_clusters << " clusters." << endl <<
+			"Average cluster length: " << double(clust_size)/n_clusters << "." << endl << endl <<
+			"Distribution of bases inside clusters (cluster length / number of bases inside clusters of that length): " << endl << endl;
+
+	uint64_t scale = *max_element(CLUST_SIZES.begin(), CLUST_SIZES.end());
+
+	for(int i=0;i<=MAX_CLUST_LEN;++i){
+
+		cout << i << ( i < 10 ? "   " : (i<100 ? "  " : " "));
+		for(uint64_t j = 0; j < (100*CLUST_SIZES[i])/scale; ++j) cout << "-";
+		cout << " " << CLUST_SIZES[i] << endl;
+
+	}
+
+	cout << "\nStored to file " << events << " events clustered in " << (cluster_nr-1) << " clusters." << endl;
+
+}
+
+/*
+ * input: BWT
+ */
 void run_one_dataset(){
 
 	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
@@ -1376,7 +1670,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:D")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:Dd:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -1392,6 +1686,9 @@ int main(int argc, char** argv){
 			break;
 			case '2':
 				input2 = string(optarg);
+			break;
+			case 'd':
+				input_da = string(optarg);
 			break;
 			case 'm':
 				mcov_out = atoi(optarg);
@@ -1442,6 +1739,13 @@ int main(int argc, char** argv){
 		help();
 	}
 
+	if(input2.compare("")==0 and input_da.compare("")==0){
+
+		cout << "Error: Document array (-d) can only be used with one input BWT file (-1)" << endl << endl;
+		help();
+
+	}
+
 	cout << "This is ebwt2snp, version 2." << endl;
 
 	if(input2.length()>0){
@@ -1450,7 +1754,15 @@ int main(int argc, char** argv){
 
 	}else{
 
-		cout << "Running on one sample (genotyping). Input eBWT file : " << input1 << endl;
+		if(input_da.compare("")==0){
+
+			cout << "Running on two samples with input Document array. Input eBWT/DA files : " << input1 << " and " << input_da << endl;
+
+		}else{
+
+			cout << "Running on one sample (genotyping). Input eBWT file : " << input1 << endl;
+
+		}
 
 	}
 
@@ -1477,7 +1789,15 @@ int main(int argc, char** argv){
 
 	}else{
 
-		run_one_dataset();
+		if(input_da.length()>0){
+
+			run_two_datasets_da();
+
+		}else{
+
+			run_one_dataset();
+
+		}
 
 	}
 
