@@ -344,7 +344,7 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	}
 
-	/*std::sort(frequent_char_0.begin(), frequent_char_0.end());
+	std::sort(frequent_char_0.begin(), frequent_char_0.end());
 	std::sort(frequent_char_1.begin(), frequent_char_1.end());
 
 	//all variations observed in cluster
@@ -358,13 +358,13 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 		frequent_char_1.size()==0 or // not covered enough
 		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
 		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_0 == frequent_char_1 or  			// same alleles: probably both heterozigous / multiple region (and no variants)
-		all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
+		frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
+		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
 		return out;
 
-	}*/
+	}
 
 	//for each frequent char in each of the two individuals, find the associated
 	//left-context and corresponding coverage using backward search
@@ -447,7 +447,7 @@ vector<variant_single_t> find_variants(dna_bwt_t & bwt, range_t range){
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char.size()<2 ) return out;
 
-	//for each frequent char in each of the two individuals, find the associated
+	//for each frequent char find the associated
 	//left-context and corresponding coverage using backward search
 
 	vector<pair<string, int> > left_contexts;
@@ -511,6 +511,28 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
 
 	}
 
+	std::sort(frequent_char_0.begin(), frequent_char_0.end());
+	std::sort(frequent_char_1.begin(), frequent_char_1.end());
+
+	//all variations observed in cluster
+	auto all_chars = frequent_char_0;
+	all_chars.insert(all_chars.begin(), frequent_char_1.begin(), frequent_char_1.end());
+	std::sort( all_chars.begin(), all_chars.end() );
+	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
+
+	//filter: remove clusters that cannot reflect a variation
+	if(	frequent_char_0.size()==0 or // not covered enough
+		frequent_char_1.size()==0 or // not covered enough
+		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
+		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
+		frequent_char_0 == frequent_char_1  			// same alleles: probably both heterozigous / multiple region (and no variants)
+		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
+	){
+
+		return out;
+
+	}
+
 	vector<pair<string, int> > left_contexts_0;
 	vector<pair<string, int> > left_contexts_1;
 
@@ -562,14 +584,18 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
  */
 void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
+	bool found = false;
+
 	for(auto v:output_variants){
 
 		auto d = distance(v.left_context_0,v.left_context_1);
 
 		if(d.first <= max_snvs and v.support_0 >= mcov_out and v.support_1 >= mcov_out){
 
+			found=true;
+
 			/*
-			 * sample 1
+			 * sample 1cluster_nr ++;
 			 */
 
 			string ID;
@@ -683,10 +709,13 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 			out_file << DNA << endl;
 
 			id_nr++;
+			events+=2;//number of output sequences
 
 		}
 
 	}
+
+	cluster_nr += found;
 
 }
 
@@ -1447,7 +1476,7 @@ void run_two_datasets_da(){
 
 	}
 
-	cout << "\nStored to file " << events << " events clustered in " << (cluster_nr-1) << " clusters." << endl;
+	cout << "\nStored to file " << events << " sequences clustered in " << (cluster_nr-1) << " clusters." << endl;
 
 }
 
