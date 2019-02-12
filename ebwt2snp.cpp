@@ -57,6 +57,10 @@ vector<bool> LCP_minima;
 vector<bool> LCP_threshold;
 vector<bool> DA;
 
+//parameter -c
+int complexity_def = k_right_def-10 < 0 ? 0 : k_right_def-10;
+int complexity = 0;
+
 //vector<uint8_t> LCP;
 
 uint64_t n_bases = 0; //number of bases in clusters
@@ -81,6 +85,8 @@ void help(){
 	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
 	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
 	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
+	"-c <arg>    Discard events with low-complexity right-context. Here, low-complexity means that the context starts with a run of <arg> equal characters." << endl <<
+	"            Default: length of right context (-R), minus 10." << endl <<
 	"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
@@ -128,6 +134,17 @@ struct variant_single_t{
 	int support;
 
 };
+
+//true iff s starts with a run of >= k equal characters
+bool has_run(string & s, int k){
+
+	if(k>s.length()) return false;
+
+	for(int i=1;i<k;++i) if(s[i]!=s[i-1]) return false;
+
+	return true;
+
+}
 
 /*
  * Hamming distance on strings. If length is different, align them on the right and discard extra chars on left.
@@ -590,7 +607,9 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 		auto d = distance(v.left_context_0,v.left_context_1);
 
-		if(d.first <= max_snvs and v.support_0 >= mcov_out and v.support_1 >= mcov_out){
+		if(		(not has_run(v.right_context,complexity)) and
+				d.first <= max_snvs and
+				v.support_0 >= mcov_out and v.support_1 >= mcov_out){
 
 			found=true;
 
@@ -744,7 +763,7 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 		for(auto v:output_variants){
 
-			if(v.support >= mcov_out){
+			if((not has_run(v.right_context,complexity)) and v.support >= mcov_out){
 
 				string ID = ">";
 
@@ -770,9 +789,9 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 			}
 
-		}
+			cluster_nr ++;
 
-		cluster_nr ++;
+		}
 
 	}
 
@@ -1701,7 +1720,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:Dd:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:Dd:c:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -1742,6 +1761,9 @@ int main(int argc, char** argv){
 			case 't':
 				TERM = atoi(optarg);
 			break;
+			case 'c':
+				complexity = atoi(optarg);
+			break;
 			case 'D':
 				diploid = true;
 			break;
@@ -1751,6 +1773,7 @@ int main(int argc, char** argv){
 		}
 	}
 
+	complexity = complexity == 0 ? complexity_def : complexity;
 	K = K == 0 ? K_def : K;
 	max_gap = max_gap==0?max_gap_def:max_gap;
 	k_left = k_left==0?k_left_def:k_left;
@@ -1799,6 +1822,7 @@ int main(int argc, char** argv){
 
 	cout << "Left-extending eBWT ranges by " << k_left << " bases." << endl <<
 	"Right context length: " << k_right << " bases." << endl <<
+	"Complexity filter: " << complexity << endl <<
 	"Storing output events to file " << output << endl <<
 	"Minimum coverage of output events: " << mcov_out << endl;
 
