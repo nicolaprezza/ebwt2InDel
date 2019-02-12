@@ -348,10 +348,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	std::sort(frequent_char_1.begin(), frequent_char_1.end());
 
 	//all variations observed in cluster
-	auto all_chars = frequent_char_0;
+	/*auto all_chars = frequent_char_0;
 	all_chars.insert(all_chars.begin(), frequent_char_1.begin(), frequent_char_1.end());
 	std::sort( all_chars.begin(), all_chars.end() );
-	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
+	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());*/
 
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
@@ -515,10 +515,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
 	std::sort(frequent_char_1.begin(), frequent_char_1.end());
 
 	//all variations observed in cluster
-	auto all_chars = frequent_char_0;
+	/*auto all_chars = frequent_char_0;
 	all_chars.insert(all_chars.begin(), frequent_char_1.begin(), frequent_char_1.end());
 	std::sort( all_chars.begin(), all_chars.end() );
-	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());
+	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());*/
 
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
@@ -1405,11 +1405,15 @@ void run_two_datasets_da(){
 
 	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
 
+	//read DA
 	for(uint64_t i=0;i<n;++i){
 
-		//read next boolean DA value
 		da_file.read((char*)&x,1);
 		DA[i] = (x=='1');
+
+	}
+
+	for(uint64_t i=0;i<n;++i){
 
 		if(LCP_threshold[2*i] and not LCP_minima[i]){
 
@@ -1673,8 +1677,8 @@ void run_one_dataset(){
 	cout 	<< endl << "Done." << endl <<
 			"Analyzed " << n_clusters << " clusters." << endl <<
 			"Average cluster length: " << double(clust_size)/n_clusters << "." << endl << endl <<
-			"Distribution of bases inside clusters (cluster length / number of bases inside clusters of that length): " << endl << endl;
-
+			"Stored to file " << events << " events clustered in " << (cluster_nr-1) << " clusters." << endl << endl <<
+			"Distribution of bases inside clusters (cluster length / number of bases inside clusters of that length): " << endl;
 
 
 	uint64_t scale = *max_element(CLUST_SIZES.begin(), CLUST_SIZES.end());
@@ -1686,8 +1690,6 @@ void run_one_dataset(){
 		cout << " " << CLUST_SIZES[i] << endl;
 
 	}
-
-	cout << "\nStored to file " << events << " events clustered in " << (cluster_nr-1) << " clusters." << endl;
 
 }
 
