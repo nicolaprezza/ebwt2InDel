@@ -198,6 +198,8 @@ int main(int argc, char** argv){
 	string str;
 	out << "#CHROM\tPOS\tID\tREF\tALT\tTYPE" << endl;
 
+	int ID = 1; //event ID
+
 	while(getline(isam, str)){
 
 		if(str[0]!='@' and str[0]!='['){//skip header
@@ -230,8 +232,6 @@ int main(int argc, char** argv){
 			getline(iss, NM, '\t');
 
 			uint64_t pos_int = atoi(pos.c_str());
-
-			int ID = 1; //event ID
 
 			int n_mism = 0;
 
