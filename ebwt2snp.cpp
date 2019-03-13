@@ -1227,7 +1227,7 @@ void run_two_datasets(){
 				if(clust_len>=2*mcov_out){
 
 					n_clusters++;
-					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});
+					vector<variant_t> var = find_variants(bwt1, bwt2, {begin0,i0}, {begin1,i1});//CLUSTER: two datasets (two BWTs)
 					to_file(var,out_file);
 
 				}
@@ -1459,7 +1459,7 @@ void run_two_datasets_da(){
 				if(clust_len>=2*mcov_out){
 
 					n_clusters++;
-					vector<variant_t> var = find_variants(bwt, DA, {begin,i});
+					vector<variant_t> var = find_variants(bwt, DA, {begin,i});//CLUSTER: two datasets (one BWT and DA)
 					to_file(var,out_file);
 
 				}
@@ -1668,7 +1668,7 @@ void run_one_dataset(){
 				if(clust_len>=2*mcov_out){
 
 					n_clusters++;
-					vector<variant_single_t> var = find_variants(bwt, {begin,i});
+					vector<variant_single_t> var = find_variants(bwt, {begin,i});//CLUSTER: one dataset (one BWT)
 					to_file(var,out_file);
 
 				}
