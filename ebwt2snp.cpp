@@ -1793,7 +1793,7 @@ int main(int argc, char** argv){
 		help();
 	}
 
-	if(input2.compare("")==0 and input_da.compare("")==0){
+	if(input2.compare("")!=0 and input_da.compare("")!=0){
 
 		cout << "Error: Document array (-d) can only be used with one input BWT file (-1)" << endl << endl;
 		help();
@@ -1808,9 +1808,9 @@ int main(int argc, char** argv){
 
 	}else{
 
-		if(input_da.compare("")==0){
+		if(input_da.compare("")!=0){
 
-			cout << "Running on two samples with input Document array. Input eBWT/DA files : " << input1 << " and " << input_da << endl;
+			cout << "Running on one sample with input Document array. Input eBWT/DA files : " << input1 << " and " << input_da << endl;
 
 		}else{
 
