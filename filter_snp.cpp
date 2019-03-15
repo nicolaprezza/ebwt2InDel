@@ -16,7 +16,7 @@ using namespace std;
 void help(){
 
 	cout << "filter_snp calls.snp m" << endl << endl <<
-	"Input: a .snp file. Keep only events with at least coverage m (in both variants). Output to stdout." << endl;
+	"Input: a .snp file. Keep only reads with at least coverage m. Output to stdout." << endl;
 	exit(0);
 }
 
@@ -32,84 +32,42 @@ int main(int argc, char** argv){
 	string str;
 	unsigned int idx=0;
 
-	string event_type;
-	string event_number;
-	string snp_pos;
-	string cov0;
-	string cov1;
-	string event;
+	int cov=0;
 
-	string line1;
-	string line2;
-	string line3;
-	string line4;
+	string header;
 
 	while(getline(is, str)){
 
-		if(idx%4==0){//first line of call
+		if(idx%2==0){//header
 
-			line1 = str;
+			header = str;
 
-			std::istringstream iss_bar(str);
+			std::istringstream iss1(str);
 			std::string token;
-			getline(iss_bar, token, '|');
-			token = token.substr(1);
+			getline(iss1, token, '_');//cluster
+			getline(iss1, token, '_');//id
+			getline(iss1, token, '_');//right
+			getline(iss1, token, '_');//cov
 
 			{
-				std::istringstream iss_underscore(token);
-				getline(iss_underscore, event_type, '_');
-				getline(iss_underscore, token, '_');
-				getline(iss_underscore, token, '_');
-				getline(iss_underscore, event_number, '_');
+				std::istringstream iss2(token);
+				getline(iss2, token, ':');//cov
+				getline(iss2, token, ':');//value
+				cov = atoi(token.c_str());
 			}
 
-			getline(iss_bar, token, '|');
+		}else{
 
-			{
-				std::istringstream iss_dots(token);
-				getline(iss_dots, token, ':');
-				getline(iss_dots, token, ':');
-				std::istringstream iss_underscore(token);
-				getline(iss_underscore, snp_pos, '_');
-				getline(iss_underscore, event, '_');
+			if(cov>=m){
+
+				cout << header << endl << str << endl;
 
 			}
 
-			getline(iss_bar, cov0, '|');
+			header="";
+			cov=0;
 
 		}
-
-		if(idx%4==1){//DNA of first individual (the reference)
-
-			line2 = str;
-
-		}
-
-		if(idx%4==2){//header second individual
-
-			line3 = str;
-
-			std::istringstream iss_bar(str);
-			getline(iss_bar, cov1, '|');
-			getline(iss_bar, cov1, '|');
-			getline(iss_bar, cov1, '|');
-
-		}
-
-		if(idx%4==3){//DNA of second individual (ALT)
-
-			line4 = str;
-
-			if(atoi(cov0.c_str())>=m and atoi(cov1.c_str())>=m){
-
-				cout << line1 << endl << line2 << endl << line3 << endl << line4 << endl;
-
-			}
-
-
-		}
-
-		idx++;
 
 	}
 

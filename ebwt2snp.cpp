@@ -26,7 +26,7 @@ int k_right = 0;//extract k_right nucleotides from right of suffix array range, 
 int max_snvs_def = 2;//maximum number of SNVs allowed in left contexts (excluded main SNV).
 int max_snvs = 0;//maximum number of SNVs allowed in left contexts
 
-int mcov_out_def = 4;//minimum cluster length / coverage of output events
+int mcov_out_def = 6;//minimum cluster length / coverage of output events
 int mcov_out = 0;
 
 //max indel length. If 0, indels are disabled.
@@ -603,6 +603,8 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 	bool found = false;
 
+	id_nr = 1;//ID of the event inside the cluster. Here, events are pairs of reads; each read in the pair has the same ID
+
 	for(auto v:output_variants){
 
 		auto d = distance(v.left_context_0,v.left_context_1);
@@ -613,26 +615,29 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 			found=true;
 
-			/*
-			 * sample 1cluster_nr ++;
-			 */
+			//first individual
 
-			string ID;
+			string ID = ">";
+
+			ID.append("cluster:");
+			ID.append(to_string(cluster_nr));
+			ID.append("_id:");
+			ID.append(to_string(id_nr));
+			ID.append("_right:");
+			ID.append(to_string(v.right_context.size()));
+			ID.append("_cov:");
+			ID.append(std::to_string(v.support_0));//we write the number of reads supporting this variant
+			ID.append("_type:");
 
 			if(d.second != 0){
 
-				ID =  ">INDEL_higher_path_";
+				ID.append("_INDEL_event:");
 
 			}else{
 
-				ID =  ">SNP_higher_path_";
+				ID.append("_SNP_event:");
 
 			}
-
-			ID.append(to_string(id_nr));
-			ID.append("|P_1:");
-			ID.append(to_string(v.right_context.size()));
-			ID.append("_");
 
 			string snv_type;
 
@@ -655,10 +660,6 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 			}
 
 			ID.append(snv_type);
-			ID.append("|");
-			ID.append(std::to_string(v.support_0));//we write the number of reads supporting this variant
-			//ID.append("high");
-			ID.append("|nb_pol_1");
 
 			out_file << ID << endl;
 
@@ -680,31 +681,35 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 			DNA.append(v.right_context);
 
+
 			out_file << DNA << endl;
 
-			/*
-			 * sample 2
-			 */
+
+			//second individual
+
+			ID = ">";
+
+			ID.append("cluster:");
+			ID.append(to_string(cluster_nr));
+			ID.append("_id:");
+			ID.append(to_string(id_nr));
+			ID.append("_right:");
+			ID.append(to_string(v.right_context.size()));
+			ID.append("_cov:");
+			ID.append(std::to_string(v.support_1));//we write the number of reads supporting this variant
+			ID.append("_type:");
 
 			if(d.second != 0){
 
-				ID =  ">INDEL_lower_path_";
+				ID.append("_INDEL_event:");
 
 			}else{
 
-				ID =  ">SNP_lower_path_";
+				ID.append("_SNP_event:");
 
 			}
 
-			ID.append(to_string(id_nr));
-			ID.append("|P_1:");
-			ID.append(to_string(v.right_context.size()));
-			ID.append("_");
 			ID.append(snv_type);
-			ID.append("|");
-			ID.append(std::to_string(v.support_1));
-			//ID.append("high");
-			ID.append("|nb_pol_1");
 
 			out_file << ID << endl;
 
@@ -728,7 +733,6 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 			out_file << DNA << endl;
 
 			id_nr++;
-			events+=2;//number of output sequences
 
 		}
 
@@ -759,7 +763,7 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 	if(max_dist <= max_snvs and nr_covered >= 2){
 
-		id_nr = 1;
+		id_nr = 1;//ID of event inside cluster. Here, an event is a single read. Each read in the cluster has a different ID.
 
 		for(auto v:output_variants){
 
@@ -771,7 +775,7 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 				ID.append(to_string(cluster_nr));
 				ID.append("_id:");
 				ID.append(to_string(id_nr));
-				ID.append("_pos:");
+				ID.append("_right:");
 				ID.append(to_string(v.right_context.size()));
 				ID.append("_cov:");
 				ID.append(std::to_string(v.support));//we write the number of reads supporting this variant
@@ -789,11 +793,11 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 			}
 
-			cluster_nr ++;
-
 		}
 
 	}
+
+	cluster_nr ++;
 
 }
 
@@ -1826,14 +1830,16 @@ int main(int argc, char** argv){
 	"Storing output events to file " << output << endl <<
 	"Minimum coverage of output events: " << mcov_out << endl;
 
-	if(diploid){
+	if(input2.compare("")!=0 or input_da.compare("")!=0){
+		if(diploid){
 
-		cout << "Input: Diploid." << endl;
+			cout << "Input: Diploid." << endl;
 
-	}else{
+		}else{
 
-		cout << "Input: Haploid." << endl;
+			cout << "Input: Haploid." << endl;
 
+		}
 	}
 
 	cout << endl;
