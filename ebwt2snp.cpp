@@ -87,7 +87,7 @@ void help(){
 	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
 	"-c <arg>    Discard events with low-complexity right-context. Here, low-complexity means that the context starts with a run of <arg> equal characters." << endl <<
 	"            Default: length of right context (-R), minus 10." << endl <<
-	"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
+	//"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
@@ -372,10 +372,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
-		frequent_char_1.size()==0 or // not covered enough
-		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
+		frequent_char_1.size()==0 //or // not covered enough
+		//frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
+		//frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
+		//frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
 		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
@@ -539,10 +539,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
 
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
-		frequent_char_1.size()==0 or // not covered enough
-		frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_0 == frequent_char_1  			// same alleles: probably both heterozigous / multiple region (and no variants)
+		frequent_char_1.size()==0 //or // not covered enough
+		//frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
+		//frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
+		//frequent_char_0 == frequent_char_1  			// same alleles: probably both heterozigous / multiple region (and no variants)
 		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
@@ -1724,7 +1724,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:Dd:c:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:d:c:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -1830,7 +1830,7 @@ int main(int argc, char** argv){
 	"Storing output events to file " << output << endl <<
 	"Minimum coverage of output events: " << mcov_out << endl;
 
-	if(input2.compare("")!=0 or input_da.compare("")!=0){
+	/*if(input2.compare("")!=0 or input_da.compare("")!=0){
 		if(diploid){
 
 			cout << "Input: Diploid." << endl;
@@ -1840,7 +1840,7 @@ int main(int argc, char** argv){
 			cout << "Input: Haploid." << endl;
 
 		}
-	}
+	}*/
 
 	cout << endl;
 
