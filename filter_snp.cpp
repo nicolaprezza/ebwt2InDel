@@ -15,17 +15,20 @@ using namespace std;
 
 void help(){
 
-	cout << "filter_snp calls.snp m" << endl << endl <<
-	"Input: a .snp file. Keep only reads with at least coverage m. Output to stdout." << endl;
+	cout << "filter_snp calls.snp m [M]" << endl << endl <<
+	"Input: a .snp file. Keep only reads with at least coverage m and at most M. Output to stdout." << endl;
 	exit(0);
 }
 
 int main(int argc, char** argv){
 
-	if(argc != 3) help();
+	if(argc != 3 and argc != 4) help();
 
 	string infile = argv[1];
 	int m = atoi(argv[2]);
+	int M = 0;
+
+	if(argc==4) M = atoi(argv[3]);
 
 	ifstream is(infile);
 
@@ -58,7 +61,7 @@ int main(int argc, char** argv){
 
 		}else{
 
-			if(cov>=m){
+			if(cov>=m and (M==0 or cov <= M)){
 
 				cout << header << endl << str << endl;
 
