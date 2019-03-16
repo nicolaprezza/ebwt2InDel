@@ -68,6 +68,8 @@ uint64_t events = 0;//number of outputted events
 
 uint64_t id_nr = 1;
 
+int max_variants_per_position = 0;
+
 void help(){
 
 	cout << "ebwt2snp [options]" << endl <<
@@ -87,6 +89,9 @@ void help(){
 	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
 	"-c <arg>    Discard events with low-complexity right-context. Here, low-complexity means that the context starts with a run of <arg> equal characters." << endl <<
 	"            Default: length of right context (-R), minus 10." << endl <<
+	"-q          Maximum number of allowed variants per single genomic position in each sample. If 0, there is no limit. Hint: use -q 2 if each input "
+	"            sample is known to belong to one diploid organisms. Use -q 0 if the number of organisms per sample is unknown (e.g. metagenomics). "
+	"            If used correctly, this parameter improves precision. Default: 0." <<  endl <<
 	//"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
@@ -370,12 +375,12 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 	std::sort( all_chars.begin(), all_chars.end() );
 	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());*/
 
-	//filter: remove clusters that cannot reflect a variation
+	//FILTER: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
 		frequent_char_1.size()==0 or // not covered enough
-		//frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
-		//frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
+		(max_variants_per_position>0 and frequent_char_0.size() > max_variants_per_position) or
+		(max_variants_per_position>0 and frequent_char_1.size() > max_variants_per_position)
+		//frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
 		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
@@ -461,8 +466,13 @@ vector<variant_single_t> find_variants(dna_bwt_t & bwt, range_t range){
 
 	//all variations observed in cluster
 
-	//filter: remove clusters that cannot reflect a variation
-	if(	frequent_char.size()<2 ) return out;
+	//FILTER: remove clusters that cannot reflect a variation
+	if(	frequent_char.size()<2 or
+		(max_variants_per_position>0 and frequent_char.size() > max_variants_per_position)){
+
+		return out;
+
+	}
 
 	//for each frequent char find the associated
 	//left-context and corresponding coverage using backward search
@@ -537,11 +547,11 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
 	std::sort( all_chars.begin(), all_chars.end() );
 	all_chars.erase(std::unique( all_chars.begin(), all_chars.end() ), all_chars.end());*/
 
-	//filter: remove clusters that cannot reflect a variation
+	//FILTER: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
-		frequent_char_1.size()==0 //or // not covered enough
-		//frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
-		//frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
+		frequent_char_1.size()==0 or // not covered enough
+		(max_variants_per_position>0 and frequent_char_0.size() > max_variants_per_position) or
+		(max_variants_per_position>0 and frequent_char_1.size() > max_variants_per_position)
 		//frequent_char_0 == frequent_char_1  			// same alleles: probably both heterozigous / multiple region (and no variants)
 		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
@@ -1724,7 +1734,7 @@ int main(int argc, char** argv){
 	if(argc < 3) help();
 
 	int opt;
-	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:d:c:")) != -1){
+	while ((opt = getopt(argc, argv, "h1:2:v:L:R:m:g:k:t:o:d:c:q:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -1767,6 +1777,9 @@ int main(int argc, char** argv){
 			break;
 			case 'c':
 				complexity = atoi(optarg);
+			break;
+			case 'q':
+				max_variants_per_position = atoi(optarg);
 			break;
 			case 'D':
 				diploid = true;
@@ -1828,19 +1841,8 @@ int main(int argc, char** argv){
 	"Right context length: " << k_right << " bases." << endl <<
 	"Complexity filter: " << complexity << endl <<
 	"Storing output events to file " << output << endl <<
-	"Minimum coverage of output events: " << mcov_out << endl;
-
-	/*if(input2.compare("")!=0 or input_da.compare("")!=0){
-		if(diploid){
-
-			cout << "Input: Diploid." << endl;
-
-		}else{
-
-			cout << "Input: Haploid." << endl;
-
-		}
-	}*/
+	"Minimum coverage of output events: " << mcov_out << endl <<
+	"Maximum number of variants per genomic position per sample:" << max_variants_per_position << endl;
 
 	cout << endl;
 
