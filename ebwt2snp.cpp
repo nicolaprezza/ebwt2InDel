@@ -372,10 +372,10 @@ vector<variant_t> find_variants(dna_bwt_t & bwt1, dna_bwt_t & bwt2, range_t rang
 
 	//filter: remove clusters that cannot reflect a variation
 	if(	frequent_char_0.size()==0 or // not covered enough
-		frequent_char_1.size()==0 //or // not covered enough
+		frequent_char_1.size()==0 or // not covered enough
 		//frequent_char_0.size() > (diploid ? 2 : 1) or 	// we require at most 2/1 alleles per individual (diploid/haploid)
 		//frequent_char_1.size() > (diploid ? 2 : 1) or 	// we require  at most 2/1 alleles per individual (diploid/haploid)
-		//frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
+		frequent_char_0 == frequent_char_1   			// same alleles: probably both heterozigous / multiple region (and no variants)
 		//all_chars.size() > 2 							// too many distinct frequent characters in the cluster (probably multiple region)
 	){
 
