@@ -69,6 +69,8 @@ int main(int argc, char** argv){
 
 		}
 
+		idx++;
+
 	}
 
 	is.close();

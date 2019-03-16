@@ -1842,7 +1842,7 @@ int main(int argc, char** argv){
 	"Complexity filter: " << complexity << endl <<
 	"Storing output events to file " << output << endl <<
 	"Minimum coverage of output events: " << mcov_out << endl <<
-	"Maximum number of variants per genomic position per sample:" << max_variants_per_position << endl;
+	"Maximum number of variants per genomic position per sample: " << max_variants_per_position << endl;
 
 	cout << endl;
 
