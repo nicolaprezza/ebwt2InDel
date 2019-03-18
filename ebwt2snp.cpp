@@ -89,10 +89,9 @@ void help(){
 	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
 	"-c <arg>    Discard events with low-complexity right-context. Here, low-complexity means that the context starts with a run of <arg> equal characters." << endl <<
 	"            Default: length of right context (-R), minus 10." << endl <<
-	"-q          Maximum number of allowed variants per single genomic position in each sample. If 0, there is no limit. Hint: use -q 2 if each input "
-	"            sample is known to belong to one diploid organisms. Use -q 0 if the number of organisms per sample is unknown (e.g. metagenomics). "
+	"-q          Maximum number of allowed variants per single genomic position in each sample. If 0, there is no limit. Hint: use -q 2 if each input " << endl <<
+	"            sample is known to belong to one diploid organisms. Use -q 0 if the number of organisms per sample is unknown (e.g. metagenomics). " << endl <<
 	"            If used correctly, this parameter improves precision. Default: 0." <<  endl <<
-	//"-D          Samples are diploid (default: haploid). Not effective during genotyping (i.e. only -1 specified)." <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
