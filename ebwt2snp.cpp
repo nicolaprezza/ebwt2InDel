@@ -1840,8 +1840,17 @@ int main(int argc, char** argv){
 	"Right context length: " << k_right << " bases." << endl <<
 	"Complexity filter: " << complexity << endl <<
 	"Storing output events to file " << output << endl <<
-	"Minimum coverage of output events: " << mcov_out << endl <<
-	"Maximum number of variants per genomic position per sample: " << max_variants_per_position << endl;
+	"Minimum coverage of output events: " << mcov_out << endl;
+
+	if(max_variants_per_position>0){
+
+		cout << "Maximum number of variants per genomic position per sample: " << max_variants_per_position << endl;
+
+	}else{
+
+		cout << "Maximum number of variants per genomic position per sample: unlimited." << endl;
+
+	}
 
 	cout << endl;
 
