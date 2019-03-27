@@ -81,17 +81,15 @@ void help(){
 	"-d <arg>    Input Document Array. If option -2 is not specified, this file specifies which characters from the input bwt" << endl <<
 	"            belong to the first (0) and which from the second (1) individual. Format: ASCII file filled with '0' and '1'." << endl <<
 	"-o <arg>    Output .snp file (REQUIRED)." << endl <<
-	"-L <arg>    Length of left-context, SNP included (default: " << k_left_def << ")." << endl <<
-	"-R <arg>    Length of right context, SNP excluded (default: " << k_right_def << ")." << endl <<
-	"-k <arg>    Minimum LCP required in clusters (default: " << K_def << ")" << endl <<
-	"-g <arg>    Maximum allowed gap length in indel (default: " << max_gap_def << "). If 0, indels are disabled."<< endl <<
-	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts. The central SNP/indel is excluded from this count (default: " << max_snvs_def << ")."<< endl <<
-	"-m <arg>    Minimum coverage of output events (default: " << mcov_out_def << ")." <<  endl <<
-	"-c <arg>    Discard events with low-complexity right-context. Here, low-complexity means that the context starts with a run of <arg> equal characters." << endl <<
-	"            Default: length of right context (-R), minus 10." << endl <<
-	"-q          Maximum number of allowed variants per single genomic position in each sample. If 0, there is no limit. Hint: use -q 2 if each input " << endl <<
-	"            sample is known to belong to one diploid organisms. Use -q 0 if the number of organisms per sample is unknown (e.g. metagenomics). " << endl <<
-	"            If used correctly, this parameter improves precision. Default: 0." <<  endl <<
+	"-L <arg>    Length of left-context, SNP included. Default: " << k_left_def << "." << endl <<
+	"-R <arg>    Length of right context, SNP excluded. Default: " << k_right_def << "." << endl <<
+	"-k <arg>    Minimum LCP required in clusters. Default: " << K_def << "." << endl <<
+	"-g <arg>    Maximum allowed gap length in indel. Default: " << max_gap_def << ". If 0, indels are disabled."<< endl <<
+	"-v <arg>    Maximum number of non-isolated SNPs in left-contexts (excluding cntral SNP/indel). Default: " << max_snvs_def << "."<< endl <<
+	"-m <arg>    Minimum coverage of output events. Default: " << mcov_out_def << "." <<  endl <<
+	"-c <arg>    Discard events with low-complexity right-context.  Here, low-complexity means that the context starts with a " << endl <<
+	"            run of <arg> equal characters. Default: length of right context (-R), minus 10." << endl <<
+	"-q          Maximum number of allowed variants per genomic position in each sample. If 0, there is no limit. Default: 0."  <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
 	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
