@@ -67,9 +67,9 @@ void parse_cigar(string cigar, int& S, int& M1, int& DI, int& M2, char& ty){
 
 		}else{
 
-			L=0;
 			types.push_back(c);
 			len.push_back(L);
+			L=0;
 
 		}
 
