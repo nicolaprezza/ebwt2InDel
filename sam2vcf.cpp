@@ -47,50 +47,68 @@ void help(){
 	exit(0);
 }
 
-void parse_cigar(string& cigar, int& x, int& y, int& z, char& ty){
+void parse_cigar(string cigar, int& S, int& M1, int& DI, int& M2, char& ty){
 
-	int num[4];
-	char type[4];
+	S=0;
+	M1=0;
+	DI=0;
+	M2=0;
 
-	num[0]=0;
-	num[1]=0;
-	num[2]=0;
+	vector<char> types;
+	vector<int> len;
 
-	int i = 0;
+	int L=0;
 
 	for(char c:cigar){
 
-		if(i<4){
+		if('0' <= c and c <= '9'){
 
-			if('0' <= c and c <= '9'){
+			L = L*10 + (int(c)-int('0'));
 
-				num[i] = num[i]*10 + (int(c)-int('0'));
+		}else{
 
-			}else{
-
-				type[i++] = c;
-
-			}
+			L=0;
+			types.push_back(c);
+			len.push_back(L);
 
 		}
 
 	}
 
-	if(i==1 and type[0]=='M'){
-		x=num[0];
-		ty = 'M';
-		return;
+	if(types.size()==0) return;
+
+	int k = 0;
+
+	if(types[k]=='S'){
+
+		S = len[k];
+		k++;
+
 	}
 
-	if(i==3 and type[0]=='M' and (type[1]=='D' or type[1]=='I') and type[2]=='M'){
+	if(types[k]=='M'){
 
-		x = num[0];
-		y = num[1];
-		z = num[2];
+		M1 = len[k];
+		k++;
+		ty = 'M';
 
-		ty = type[1];
+	}else return;
 
-		return;
+	if(types.size()>k){
+
+		if(types[k]=='D' or types[k]=='I'){
+
+			DI = len[k];
+			ty = types[k];
+			k++;
+
+		}else return;
+
+		if(types.size()>k and types[k]=='M'){
+
+			M2 = len[k];
+
+		}
 
 	}
 
@@ -251,19 +269,20 @@ int main(int argc, char** argv){
 			//if mismatch/indel is present
 			if(n_mism>0 and n_mism <= max_mism and ref[chr].size()>0){
 
-				//only admitted cigar formats: xM or xMy{I,D}zM, where x,y,z are integers
+				//only admitted cigar formats: wS xM or xMy{I,D}zM, where w,x,y,z are integers
 
-				int x=0,y=0,z=0;
+				int S=0,M1=0,DI=0,M2=0;
 				char type = 0;
 
-				parse_cigar(cigar,x,y,z,type);
+				parse_cigar(cigar,S,M1,DI,M2,type);
 
-				int k = 0;//position on read
+				//starting positions in read and genome (skip S chars)
+				int k = S;
 
-				if(x>0){
+				if(M1>0){
 
 					//scan the first x bases in REF and ALT
-					for(int j=0;j<x;++j){
+					for(int j=0;j<M1;++j){
 
 						if(ref[chr][pos_int + j - 1] != seq[k]){
 
@@ -276,34 +295,34 @@ int main(int argc, char** argv){
 					}
 
 					//if there's an indel
-					if(y>0){
+					if(DI>0){
 
 						//insert of length y in reference
 						if(type == 'I'){
 
-							string REF = ref[chr].substr(pos_int + x - 2,1);
+							string REF = ref[chr].substr(pos_int + M1 - 2,1);
 
-							string ALT = seq.substr(k-1,y+1);
+							string ALT = seq.substr(k-1,DI+1);
 
-							k += y;
+							k += DI;
 
-							out << chr << "\t" << (pos_int + (x-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
 
 						}else if (type == 'D'){//deletion in reference
 
-							string REF = ref[chr].substr(pos_int + x - 2,y+1);
+							string REF = ref[chr].substr(pos_int + M1 - 2,DI+1);
 							string ALT = seq.substr(k-1,1);
-							out << chr << "\t" << (pos_int + (x-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
 
 						}
 
 					}
 
-					if(z>0){//scan the last z bases and look for further SNPs
+					if(M2>0){//scan the last z bases and look for further SNPs
 
-						for(int j=0;j<z;++j){
+						for(int j=0;j<M2;++j){
 
-							uint64_t start = pos_int + x + (type=='D'?y:0) -1;//start is 0-based
+							uint64_t start = pos_int + M1 + (type=='D'?DI:0) -1;//start is 0-based
 
 							if(ref[chr][start+j] != seq[k]){
 
