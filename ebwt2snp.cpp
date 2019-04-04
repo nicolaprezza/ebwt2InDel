@@ -601,7 +601,53 @@ vector<variant_t> find_variants(dna_bwt_t & bwt, vector<bool> & DA, range_t rang
 
 }
 
+/*
+ * given left/right contexts of two event, align them, find out if there's a SNP/indel, and detect what is the variant.
+ * return this info in a string that will be output to file.
+ */
+string event_type(string left_context_0, string left_context_1, pair<int,int> d = {-1,-1}){
 
+	//if distance not computed
+	if(d == pair<int,int>(-1,-1))
+		d = distance(left_context_0,left_context_1);
+
+	string OUT = "type:";
+
+	if(d.second != 0){
+
+		OUT.append("_INDEL_event:");
+
+	}else{
+
+		OUT.append("_SNP_event:");
+
+	}
+
+	string snv_type;
+
+	if(d.second==0){
+
+		snv_type += left_context_0[left_context_0.size()-1];
+		snv_type.append("/");
+		snv_type += left_context_1[left_context_1.size()-1];
+
+	}else if(d.second>0){//insert of length d.second in v.left_context_0
+
+		snv_type.append(left_context_0.substr(left_context_0.size()-d.second));
+		snv_type.append("/");
+
+	}else{//insert of length -d.second in v.left_context_1
+
+		snv_type.append("/");
+		snv_type.append(left_context_1.substr(left_context_1.size() - (-d.second)));
+
+	}
+
+	OUT.append(snv_type);
+
+	return OUT;
+
+}
 
 /*
  * detect the type of variant (SNP/indel/discard if none) and, if not discarded, output to file the two reads per variant testifying it.
@@ -624,6 +670,8 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 			//first individual
 
+			//>cluster:x_id:y_right:R_cov:C_type:SNP_event:A/C
+
 			string ID = ">";
 
 			ID.append("cluster:");
@@ -634,39 +682,11 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 			ID.append(to_string(v.right_context.size()));
 			ID.append("_cov:");
 			ID.append(std::to_string(v.support_0));//we write the number of reads supporting this variant
-			ID.append("_type:");
 
-			if(d.second != 0){
+			string type = event_type(v.left_context_0,v.left_context_1,d);
 
-				ID.append("_INDEL_event:");
-
-			}else{
-
-				ID.append("_SNP_event:");
-
-			}
-
-			string snv_type;
-
-			if(d.second==0){
-
-				snv_type += v.left_context_0[v.left_context_0.size()-1];
-				snv_type.append("/");
-				snv_type += v.left_context_1[v.left_context_1.size()-1];
-
-			}else if(d.second>0){//insert of length d.second in v.left_context_0
-
-				snv_type.append(v.left_context_0.substr(v.left_context_0.size()-d.second));
-				snv_type.append("/");
-
-			}else{//insert of length -d.second in v.left_context_1
-
-				snv_type.append("/");
-				snv_type.append(v.left_context_1.substr(v.left_context_1.size() - (-d.second)));
-
-			}
-
-			ID.append(snv_type);
+			ID.append("_");
+			ID.append(type);
 
 			out_file << ID << endl;
 
@@ -688,9 +708,7 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 
 			DNA.append(v.right_context);
 
-
 			out_file << DNA << endl;
-
 
 			//second individual
 
@@ -704,19 +722,9 @@ void to_file(vector<variant_t> & output_variants, ofstream & out_file){
 			ID.append(to_string(v.right_context.size()));
 			ID.append("_cov:");
 			ID.append(std::to_string(v.support_1));//we write the number of reads supporting this variant
-			ID.append("_type:");
 
-			if(d.second != 0){
-
-				ID.append("_INDEL_event:");
-
-			}else{
-
-				ID.append("_SNP_event:");
-
-			}
-
-			ID.append(snv_type);
+			ID.append("_");
+			ID.append(type);
 
 			out_file << ID << endl;
 
@@ -754,7 +762,8 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 	if(output_variants.size()<2) return;
 
 	int max_dist = 0;
-	int nr_covered = 0;//number of covered-enough events in cluster
+
+	vector<variant_single_t> good_variants;
 
 	for(int i=0;i<output_variants.size()-1;++i){
 
@@ -762,30 +771,49 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 		max_dist = d.first>max_dist?d.first:max_dist;
 
-		nr_covered += output_variants[i].support >= mcov_out;
+		if(output_variants[i].support >= mcov_out) good_variants.push_back(output_variants[i]);
 
 	}
 
-	nr_covered += output_variants[output_variants.size()-1].support >= mcov_out;
+	if(output_variants[output_variants.size()-1].support >= mcov_out) good_variants.push_back(output_variants[output_variants.size()-1]);
 
-	if(max_dist <= max_snvs and nr_covered >= 2){
+	if(max_dist <= max_snvs and good_variants.size() >= 2){
 
 		id_nr = 1;//ID of event inside cluster. Here, an event is a single read. Each read in the cluster has a different ID.
 
-		for(auto v:output_variants){
+		for(int i=0;i<good_variants.size();++i){
 
-			if((not has_run(v.right_context,complexity)) and v.support >= mcov_out){
+			auto v = good_variants[i];
+
+			if((not has_run(v.right_context,complexity))){
+
+				//>cluster:x_id:y_right:R_cov:C_type:SNP_event:A/C
 
 				string ID = ">";
 
 				ID.append("cluster:");
 				ID.append(to_string(cluster_nr));
 				ID.append("_id:");
-				ID.append(to_string(id_nr));
+				ID.append(to_string(id_nr++));
 				ID.append("_right:");
 				ID.append(to_string(v.right_context.size()));
 				ID.append("_cov:");
 				ID.append(std::to_string(v.support));//we write the number of reads supporting this variant
+
+				string type;
+
+				if(i==0){
+
+					type = event_type(v.left_context, good_variants[1].left_context);
+
+				}else{
+
+					type = event_type(good_variants[i-1].left_context, good_variants[1].left_context);
+
+				}
+
+				ID.append("_");
+				ID.append(type);
 
 				out_file << ID << endl;
 
@@ -795,7 +823,6 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 
 				out_file << DNA << endl;
 
-				id_nr++;
 				events++;
 
 			}
