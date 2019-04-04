@@ -34,6 +34,9 @@ bool non_isolated = true;
 
 bool only_exact = false;
 
+int tot_events=0;
+int used_events=0;
+
 void help(){
 
 	cout << "sam2vcf [OPTIONS]" << endl << endl <<
@@ -222,6 +225,8 @@ int main(int argc, char** argv){
 
 		if(str[0]!='@' and str[0]!='['){//skip header
 
+			tot_events++;
+
 			string name;//entry name
 			string flag;
 			string chr;
@@ -280,6 +285,8 @@ int main(int argc, char** argv){
 				int k = S;
 
 				if(M1>0){
+
+					used_events++;
 
 					//scan the first x bases in REF and ALT
 					for(int j=0;j<M1;++j){
@@ -343,5 +350,8 @@ int main(int argc, char** argv){
 		}
 
 	}
+
+	cout << "Done." << endl;
+	cout << "Alignments analyzed (not discarded due to bad alignment): " << used_events << "/" << tot_events << endl;
 
 }
