@@ -36,6 +36,7 @@ bool only_exact = false;
 
 int tot_events=0;
 int used_events=0;
+int good_events=0;
 
 void help(){
 
@@ -274,6 +275,8 @@ int main(int argc, char** argv){
 			//if mismatch/indel is present
 			if(n_mism>0 and n_mism <= max_mism and ref[chr].size()>0){
 
+				good_events++;
+
 				//only admitted cigar formats: wS xM or xMy{I,D}zM, where w,x,y,z are integers
 
 				int S=0,M1=0,DI=0,M2=0;
@@ -352,6 +355,6 @@ int main(int argc, char** argv){
 	}
 
 	cout << "Done." << endl;
-	cout << "Alignments analyzed (not discarded due to bad alignment): " << used_events << "/" << tot_events << endl;
+	cout << "Alignments used to generate VCF entries/alignments with 0 < errors <= max_diff: " << used_events << "/" << good_events << endl;
 
 }
