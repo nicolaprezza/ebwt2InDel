@@ -824,7 +824,6 @@ uint8_t number_of_children(pair<sa_node_n,sa_node_n> P){
 }
 
 void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right){
-//void update_lcp_threshold(sa_node & x, vector<bool> & LCP_threshold, uint64_t & lcp_values, int K, int k_right, vector<uint8_t> & LCP){//TODO debug
 
 	assert(x.first_A >= x.first_TERM);
 	assert(x.first_C >= x.first_A);

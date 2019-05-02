@@ -57,6 +57,9 @@ vector<bool> LCP_minima;
 vector<bool> LCP_threshold;
 vector<bool> DA;
 
+dna_bwt_t bwt1;
+dna_bwt_t bwt2;
+
 //parameter -c
 int complexity_def = k_right_def-10 < 0 ? 0 : k_right_def-10;
 int complexity = 0;
@@ -337,6 +340,497 @@ string extract_dna(dna_bwt_t & bwt, uint64_t i, int64_t len){
 	return res;
 
 }
+
+void update_LCP_leaf(sa_leaf L, uint64_t & lcp_values){
+
+	for(uint64_t i = L.rn.first+1; i<L.rn.second; ++i){
+
+		LCP_threshold[2*i] = (L.depth >= K);
+		LCP_threshold[2*i+1] = (L.depth >= k_right);
+
+		lcp_values++;
+
+	}
+
+}
+
+void update_lcp_minima(sa_node x, uint64_t & n_min){
+
+/*
+ * we have a minimum after the end of each child (that is different than #) of size at least 2 of the input node x, except
+ * if the candidate minimum position is the last or exceeds the interval of x
+ */
+
+	if( x.first_C - x.first_A >= 2 and 	// there are at least 2 'A'
+		x.first_C < x.last-1	 		// candidate min in x.first_C is not >= last position
+		){
+
+		LCP_minima[x.first_C] = true;
+		n_min++;
+
+	}
+
+	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
+		x.first_G < x.last-1	 		// candidate min in x.first_G is not >= last position
+		){
+
+		LCP_minima[x.first_G] = true;
+		n_min++;
+
+	}
+
+	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
+		x.first_T < x.last-1	 		// candidate min in x.first_T is not >= last position
+		){
+
+		LCP_minima[x.first_T] = true;
+		n_min++;
+
+	}
+
+}
+
+
+void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
+
+	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
+	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
+	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
+
+	assert(end>start1);
+
+	for(uint64_t i = start1; i<start2; ++i){
+		DA[i] = 0;
+		m++;
+	}
+
+	for(uint64_t i = start2; i<end; ++i){
+		DA[i] = 1;
+		m++;
+	}
+
+	assert(L1.depth==L2.depth);
+
+	for(uint64_t i = start1+1; i<end; ++i){
+
+		LCP_threshold[2*i] = (L1.depth >= K);
+		LCP_threshold[2*i+1] = (L1.depth >= k_right);
+
+		//LCP[i] = L1.depth;
+
+		lcp_values++;
+
+	}
+
+}
+
+
+
+void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & m){
+
+	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
+	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
+	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
+
+	assert(end>start1);
+
+	for(uint64_t i = start1; i<start2; ++i){
+		DA[i] = 0;
+		m++;
+	}
+
+	for(uint64_t i = start2; i<end; ++i){
+		DA[i] = 1;
+		m++;
+	}
+
+	assert(L1.depth==L2.depth);
+
+}
+
+
+void next_leaves(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_leaf & L1, sa_leaf & L2, vector<pair<sa_leaf, sa_leaf> > & TMP_LEAVES, int & t){
+
+	p_range ext_1 = bwt1.LF(L1.rn);
+	p_range ext_2 = bwt2.LF(L2.rn);
+
+	//push non-empty leaves on stack in decreasing size order
+
+	t = 0;
+	int min_size = 2;
+
+	if(range_length(ext_1.A) + range_length(ext_2.A) >= min_size) TMP_LEAVES[t++] = {{ext_1.A, L1.depth+1},{ext_2.A, L2.depth+1}};
+	if(range_length(ext_1.C) + range_length(ext_2.C) >= min_size) TMP_LEAVES[t++] = {{ext_1.C, L1.depth+1},{ext_2.C, L2.depth+1}};
+	if(range_length(ext_1.G) + range_length(ext_2.G) >= min_size) TMP_LEAVES[t++] = {{ext_1.G, L1.depth+1},{ext_2.G, L2.depth+1}};
+	if(range_length(ext_1.T) + range_length(ext_2.T) >= min_size) TMP_LEAVES[t++] = {{ext_1.T, L1.depth+1},{ext_2.T, L2.depth+1}};
+
+	std::sort( TMP_LEAVES.begin(), TMP_LEAVES.begin()+t, [ ]( const pair<sa_leaf, sa_leaf>& lhs, const pair<sa_leaf, sa_leaf>& rhs )
+	{
+		return leaf_size(lhs) < leaf_size(rhs);
+	});
+
+}
+
+void find_leaves(sa_node x1, sa_node x2, uint64_t & m){
+
+	//find leaves that were ignored in the first pass
+	if(range_length(child_TERM(x1))+range_length(child_TERM(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_TERM(x1),0};
+		sa_leaf L2 = {child_TERM(x2),0};
+
+		update_DA(L1,L2,m);
+
+	}
+
+	if(range_length(child_A(x1))+range_length(child_A(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_A(x1),0};
+		sa_leaf L2 = {child_A(x2),0};
+
+		update_DA(L1,L2,m);
+
+	}
+
+	if(range_length(child_C(x1))+range_length(child_C(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_C(x1),0};
+		sa_leaf L2 = {child_C(x2),0};
+
+		update_DA(L1,L2,m);
+
+	}
+
+	if(range_length(child_G(x1))+range_length(child_G(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_G(x1),0};
+		sa_leaf L2 = {child_G(x2),0};
+
+		update_DA(L1,L2,m);
+
+	}
+
+	if(range_length(child_T(x1))+range_length(child_T(x2)) == 1){
+
+		//symbolic depth = 0. It will not be used in update_DA
+		sa_leaf L1 = {child_T(x1),0};
+		sa_leaf L2 = {child_T(x2),0};
+
+		update_DA(L1,L2,m);
+
+	}
+
+}
+
+void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, vector<pair<sa_node, sa_node> > & TMP_NODES, int & t){
+
+	p_node left_exts1 = bwt1.LF(N1);
+	p_node left_exts2 = bwt2.LF(N2);
+
+	pair<sa_node, sa_node> A = {left_exts1.A, left_exts2.A};
+	pair<sa_node, sa_node> C = {left_exts1.C, left_exts2.C};
+	pair<sa_node, sa_node> G = {left_exts1.G, left_exts2.G};
+	pair<sa_node, sa_node> T = {left_exts1.T, left_exts2.T};
+
+	t = 0;
+
+	if(number_of_children(A) >= 2) TMP_NODES[t++] = A;
+	if(number_of_children(C) >= 2) TMP_NODES[t++] = C;
+	if(number_of_children(G) >= 2) TMP_NODES[t++] = G;
+	if(number_of_children(T) >= 2) TMP_NODES[t++] = T;
+
+	//push right-maximal nodes on stack in decreasing size (i.e. interval length) order
+
+	std::sort( TMP_NODES.begin(), TMP_NODES.begin()+t, [ ]( const pair<sa_node, sa_node>& lhs, const pair<sa_node, sa_node>& rhs )
+	{
+		return node_size(lhs) < node_size(rhs);
+	});
+
+}
+
+void navigate_one_bwt(){
+
+	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
+
+	bwt1 = dna_bwt_t(input1,TERM);
+
+	cout << "done." << endl;
+
+	uint64_t n = bwt1.size();
+
+	cout << "\nPhase 2/4: navigating suffix tree leaves." << endl;
+
+	/*
+	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
+	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
+	 */
+	LCP_threshold = vector<bool>(2*n,false);
+
+	uint64_t leaves = 0;//number of visited leaves
+	uint64_t max_stack = 0;
+	uint64_t lcp_values = 1;//number of computed LCP values
+
+	{
+
+		auto TMP_LEAVES = vector<sa_leaf>(4);
+
+		stack<sa_leaf> S;
+		S.push(bwt1.first_leaf());
+
+		int last_perc_lcp = -1;
+		int perc_lcp = 0;
+
+		while(not S.empty()){
+
+			sa_leaf L = S.top();
+			S.pop();
+			leaves++;
+
+			assert(leaf_size(L)>0);
+			max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+			update_LCP_leaf(L,lcp_values);
+
+			int t = 0;//number of children leaves
+			bwt1.next_leaves(L, TMP_LEAVES, t, 2);
+
+			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
+
+			perc_lcp = (100*lcp_values)/n;
+
+			if(perc_lcp > last_perc_lcp){
+
+				cout << "LCP: " << perc_lcp << "%.";
+				cout << endl;
+
+				last_perc_lcp = perc_lcp;
+
+			}
+
+		}
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
+
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
+
+	cout << "Phase 3/4: computing LCP minima." << endl;
+
+	LCP_minima = vector<bool>(n,false);
+
+	auto TMP_NODES = vector<sa_node>(4);
+
+	uint64_t nodes = 0;//visited ST nodes
+	max_stack = 0;
+
+	stack<sa_node> S;
+	S.push(bwt1.root());
+
+	int last_perc_lcp = -1;
+	int perc_lcp = 0;
+	uint64_t n_min = 0;//number of LCP minima
+
+	while(not S.empty()){
+
+		max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+		sa_node N = S.top();
+		S.pop();
+		nodes++;
+
+		//compute LCP values at the borders of N's children
+		update_lcp_threshold(N, LCP_threshold, lcp_values, K, k_right);
+
+		update_lcp_minima(N, n_min);
+
+		//follow Weiner links
+		int t = 0;
+		bwt1.next_nodes(N, TMP_NODES, t);
+
+		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
+
+		perc_lcp = (100*lcp_values)/n;
+
+		if(perc_lcp > last_perc_lcp){
+
+			cout << "LCP: " << perc_lcp << "%.";
+			cout << endl;
+
+			last_perc_lcp = perc_lcp;
+
+		}
+
+	}
+
+	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
+	cout << "Found " << n_min << " LCP minima." << endl;
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+
+
+}
+
+
+void navigate_two_bwts(){
+
+	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
+
+	bwt1 = dna_bwt_t(input1,TERM);
+	bwt2 = dna_bwt_t(input2,TERM);
+
+	cout << "done." << endl;
+
+	uint64_t n1 = bwt1.size();
+	uint64_t n2 = bwt2.size();
+	uint64_t n = n1+n2;
+
+	cout << "\nPhase 2/4: merging eBWTs." << endl;
+
+	DA = vector<bool>(n,false); //document array
+
+	/*
+	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
+	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
+	 */
+	LCP_threshold = vector<bool>(2*n,false);
+	//LCP = vector<uint8_t>(n,0);
+
+	uint64_t da_values = 0;//number computed DA values
+	uint64_t leaves = 0;//number of visited leaves
+	uint64_t max_stack = 0;
+	uint64_t lcp_values = 1;//number of computed LCP values
+
+	{
+
+		auto TMP_LEAVES = vector<pair<sa_leaf, sa_leaf> >(4);
+
+		stack<pair<sa_leaf, sa_leaf> > S;
+		S.push({bwt1.first_leaf(), bwt2.first_leaf()});
+
+		int last_perc_lcp = -1;
+		int last_perc_da = -1;
+		int perc_lcp = 0;
+		int perc_da = 0;
+
+		while(not S.empty()){
+
+			pair<sa_leaf, sa_leaf> L = S.top();
+			S.pop();
+			leaves++;
+
+			assert(leaf_size(L)>0);
+			max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+			sa_leaf L1 = L.first;
+			sa_leaf L2 = L.second;
+
+			update_DA(L1, L2, lcp_values, da_values);
+
+			//insert leaf in stack iff size(L1) + size(L2) >= min_size
+			//optimization: if we are computing LCP and if size(L1) + size(L2) = 1,
+			//then we will find that leaf during the internal nodes traversal (no need to visit leaf here)
+			int t = 0;//number of children leaves
+			next_leaves(bwt1, bwt2, L1, L2, TMP_LEAVES, t);
+			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
+
+			perc_lcp = (100*lcp_values)/n;
+			perc_da = (100*da_values)/n;
+
+			if(perc_da > last_perc_da){
+
+				cout << "DA: " << perc_da << "%. ";
+				cout << "LCP: " << perc_lcp << "%.";
+				cout << endl;
+
+				last_perc_lcp = perc_lcp;
+				last_perc_da = perc_da;
+
+			}
+
+		}
+	}
+
+	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
+	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
+
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
+
+	cout << "Phase 3/4: computing LCP minima." << endl;
+
+	LCP_minima = vector<bool>(n,false);
+
+	auto TMP_NODES = vector<pair<sa_node, sa_node> >(4);
+
+	uint64_t nodes = 0;//visited ST nodes
+	max_stack = 0;
+
+	stack<pair<sa_node, sa_node> > S;
+	S.push({bwt1.root(), bwt2.root()});
+
+	int last_perc_lcp = -1;
+	int perc_lcp = 0;
+	int last_perc_da = -1;
+	int perc_da = 0;
+	uint64_t n_min = 0;//number of LCP minima
+
+	while(not S.empty()){
+
+		max_stack = S.size() > max_stack ? S.size() : max_stack;
+
+		pair<sa_node, sa_node> N = S.top();
+		S.pop();
+		nodes++;
+
+		sa_node N1 = N.first;
+		sa_node N2 = N.second;
+		sa_node merged = merge_nodes(N1, N2);
+
+		//find leaves in the children of N1 and N2 that were
+		//skipped in the first pass, and update DA accordingly
+		find_leaves(N1, N2, da_values);
+
+		//compute LCP values at the borders of merged's children
+		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
+		//update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right, LCP);
+
+		update_lcp_minima(merged, n_min);
+
+		//follow Weiner links
+		int t = 0;
+		next_nodes(bwt1, bwt2, N1, N2, TMP_NODES, t);
+		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
+
+		perc_lcp = (100*lcp_values)/n;
+		perc_da = (100*da_values)/n;
+
+		if(perc_da > last_perc_da){
+
+			cout << "DA: " << perc_da << "%. ";
+			cout << "LCP: " << perc_lcp << "%.";
+			cout << endl;
+
+			last_perc_lcp = perc_lcp;
+			last_perc_da = perc_da;
+
+		}
+
+	}
+
+	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
+	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
+	cout << "Found " << n_min << " LCP minima." << endl;
+	cout << "Max stack depth = " << max_stack << endl;
+	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+
+}
+
+
 
 /*
  * input: bwts and ranges of cluster (right-excluded)
@@ -836,367 +1330,20 @@ void to_file(vector<variant_single_t> & output_variants, ofstream & out_file){
 }
 
 
-void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & lcp_values, uint64_t & m){
 
-	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
-	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
-	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
 
-	assert(end>start1);
 
-	for(uint64_t i = start1; i<start2; ++i){
-		DA[i] = 0;
-		m++;
-	}
 
-	for(uint64_t i = start2; i<end; ++i){
-		DA[i] = 1;
-		m++;
-	}
 
-	assert(L1.depth==L2.depth);
 
-	for(uint64_t i = start1+1; i<end; ++i){
 
-		LCP_threshold[2*i] = (L1.depth >= K);
-		LCP_threshold[2*i+1] = (L1.depth >= k_right);
-
-		//LCP[i] = L1.depth;
-
-		lcp_values++;
-
-	}
-
-}
-
-void update_LCP_leaf(sa_leaf L, uint64_t & lcp_values){
-
-	for(uint64_t i = L.rn.first+1; i<L.rn.second; ++i){
-
-		LCP_threshold[2*i] = (L.depth >= K);
-		LCP_threshold[2*i+1] = (L.depth >= k_right);
-
-		lcp_values++;
-
-	}
-
-}
-
-void update_DA(sa_leaf L1,sa_leaf L2, uint64_t & m){
-
-	uint64_t start1 = L1.rn.first + L2.rn.first;//start position of first interval in merged intervals
-	uint64_t start2 = L2.rn.first + L1.rn.second;//start position of second interval in merged intervals
-	uint64_t end = L1.rn.second + L2.rn.second;//end position (excluded) of merged intervals
-
-	assert(end>start1);
-
-	for(uint64_t i = start1; i<start2; ++i){
-		DA[i] = 0;
-		m++;
-	}
-
-	for(uint64_t i = start2; i<end; ++i){
-		DA[i] = 1;
-		m++;
-	}
-
-	assert(L1.depth==L2.depth);
-
-}
-
-void next_leaves(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_leaf & L1, sa_leaf & L2, vector<pair<sa_leaf, sa_leaf> > & TMP_LEAVES, int & t){
-
-	p_range ext_1 = bwt1.LF(L1.rn);
-	p_range ext_2 = bwt2.LF(L2.rn);
-
-	//push non-empty leaves on stack in decreasing size order
-
-	t = 0;
-	int min_size = 2;
-
-	if(range_length(ext_1.A) + range_length(ext_2.A) >= min_size) TMP_LEAVES[t++] = {{ext_1.A, L1.depth+1},{ext_2.A, L2.depth+1}};
-	if(range_length(ext_1.C) + range_length(ext_2.C) >= min_size) TMP_LEAVES[t++] = {{ext_1.C, L1.depth+1},{ext_2.C, L2.depth+1}};
-	if(range_length(ext_1.G) + range_length(ext_2.G) >= min_size) TMP_LEAVES[t++] = {{ext_1.G, L1.depth+1},{ext_2.G, L2.depth+1}};
-	if(range_length(ext_1.T) + range_length(ext_2.T) >= min_size) TMP_LEAVES[t++] = {{ext_1.T, L1.depth+1},{ext_2.T, L2.depth+1}};
-
-	std::sort( TMP_LEAVES.begin(), TMP_LEAVES.begin()+t, [ ]( const pair<sa_leaf, sa_leaf>& lhs, const pair<sa_leaf, sa_leaf>& rhs )
-	{
-		return leaf_size(lhs) < leaf_size(rhs);
-	});
-
-}
-
-void find_leaves(sa_node x1, sa_node x2, uint64_t & m){
-
-	//find leaves that were ignored in the first pass
-	if(range_length(child_TERM(x1))+range_length(child_TERM(x2)) == 1){
-
-		//symbolic depth = 0. It will not be used in update_DA
-		sa_leaf L1 = {child_TERM(x1),0};
-		sa_leaf L2 = {child_TERM(x2),0};
-
-		update_DA(L1,L2,m);
-
-	}
-
-	if(range_length(child_A(x1))+range_length(child_A(x2)) == 1){
-
-		//symbolic depth = 0. It will not be used in update_DA
-		sa_leaf L1 = {child_A(x1),0};
-		sa_leaf L2 = {child_A(x2),0};
-
-		update_DA(L1,L2,m);
-
-	}
-
-	if(range_length(child_C(x1))+range_length(child_C(x2)) == 1){
-
-		//symbolic depth = 0. It will not be used in update_DA
-		sa_leaf L1 = {child_C(x1),0};
-		sa_leaf L2 = {child_C(x2),0};
-
-		update_DA(L1,L2,m);
-
-	}
-
-	if(range_length(child_G(x1))+range_length(child_G(x2)) == 1){
-
-		//symbolic depth = 0. It will not be used in update_DA
-		sa_leaf L1 = {child_G(x1),0};
-		sa_leaf L2 = {child_G(x2),0};
-
-		update_DA(L1,L2,m);
-
-	}
-
-	if(range_length(child_T(x1))+range_length(child_T(x2)) == 1){
-
-		//symbolic depth = 0. It will not be used in update_DA
-		sa_leaf L1 = {child_T(x1),0};
-		sa_leaf L2 = {child_T(x2),0};
-
-		update_DA(L1,L2,m);
-
-	}
-
-}
-
-void next_nodes(dna_bwt_t & bwt1, dna_bwt_t & bwt2, sa_node & N1, sa_node & N2, vector<pair<sa_node, sa_node> > & TMP_NODES, int & t){
-
-	p_node left_exts1 = bwt1.LF(N1);
-	p_node left_exts2 = bwt2.LF(N2);
-
-	pair<sa_node, sa_node> A = {left_exts1.A, left_exts2.A};
-	pair<sa_node, sa_node> C = {left_exts1.C, left_exts2.C};
-	pair<sa_node, sa_node> G = {left_exts1.G, left_exts2.G};
-	pair<sa_node, sa_node> T = {left_exts1.T, left_exts2.T};
-
-	t = 0;
-
-	if(number_of_children(A) >= 2) TMP_NODES[t++] = A;
-	if(number_of_children(C) >= 2) TMP_NODES[t++] = C;
-	if(number_of_children(G) >= 2) TMP_NODES[t++] = G;
-	if(number_of_children(T) >= 2) TMP_NODES[t++] = T;
-
-	//push right-maximal nodes on stack in decreasing size (i.e. interval length) order
-
-	std::sort( TMP_NODES.begin(), TMP_NODES.begin()+t, [ ]( const pair<sa_node, sa_node>& lhs, const pair<sa_node, sa_node>& rhs )
-	{
-		return node_size(lhs) < node_size(rhs);
-	});
-
-}
-
-void update_lcp_minima(sa_node x, uint64_t & n_min){
-
-/*
- * we have a minimum after the end of each child (that is different than #) of size at least 2 of the input node x, except
- * if the candidate minimum position is the last or exceeds the interval of x
- */
-
-	if( x.first_C - x.first_A >= 2 and 	// there are at least 2 'A'
-		x.first_C < x.last-1	 		// candidate min in x.first_C is not >= last position
-		){
-
-		LCP_minima[x.first_C] = true;
-		n_min++;
-
-	}
-
-	if( x.first_G - x.first_C >= 2 and 	// there are at least 2 'C'
-		x.first_G < x.last-1	 		// candidate min in x.first_G is not >= last position
-		){
-
-		LCP_minima[x.first_G] = true;
-		n_min++;
-
-	}
-
-	if( x.first_T - x.first_G >= 2 and 	// there are at least 2 'G'
-		x.first_T < x.last-1	 		// candidate min in x.first_T is not >= last position
-		){
-
-		LCP_minima[x.first_T] = true;
-		n_min++;
-
-	}
-
-}
 
 /*
  * input: two BWTs
  */
 void run_two_datasets(){
 
-	cout << "Phase 1/4: loading and indexing eBWTs ... " << flush;
-
-	dna_bwt_t bwt1 = dna_bwt_t(input1,TERM);
-	dna_bwt_t bwt2 = dna_bwt_t(input2,TERM);
-
-	cout << "done." << endl;
-
-	uint64_t n1 = bwt1.size();
-	uint64_t n2 = bwt2.size();
-	uint64_t n = n1+n2;
-
-	cout << "\nPhase 2/4: merging eBWTs." << endl;
-
-	DA = vector<bool>(n,false); //document array
-
-	/*
-	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
-	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
-	 */
-	LCP_threshold = vector<bool>(2*n,false);
-	//LCP = vector<uint8_t>(n,0);
-
-	uint64_t da_values = 0;//number computed DA values
-	uint64_t leaves = 0;//number of visited leaves
-	uint64_t max_stack = 0;
-	uint64_t lcp_values = 1;//number of computed LCP values
-
-	{
-
-		auto TMP_LEAVES = vector<pair<sa_leaf, sa_leaf> >(4);
-
-		stack<pair<sa_leaf, sa_leaf> > S;
-		S.push({bwt1.first_leaf(), bwt2.first_leaf()});
-
-		int last_perc_lcp = -1;
-		int last_perc_da = -1;
-		int perc_lcp = 0;
-		int perc_da = 0;
-
-		while(not S.empty()){
-
-			pair<sa_leaf, sa_leaf> L = S.top();
-			S.pop();
-			leaves++;
-
-			assert(leaf_size(L)>0);
-			max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-			sa_leaf L1 = L.first;
-			sa_leaf L2 = L.second;
-
-			update_DA(L1, L2, lcp_values, da_values);
-
-			//insert leaf in stack iff size(L1) + size(L2) >= min_size
-			//optimization: if we are computing LCP and if size(L1) + size(L2) = 1,
-			//then we will find that leaf during the internal nodes traversal (no need to visit leaf here)
-			int t = 0;//number of children leaves
-			next_leaves(bwt1, bwt2, L1, L2, TMP_LEAVES, t);
-			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
-
-			perc_lcp = (100*lcp_values)/n;
-			perc_da = (100*da_values)/n;
-
-			if(perc_da > last_perc_da){
-
-				cout << "DA: " << perc_da << "%. ";
-				cout << "LCP: " << perc_lcp << "%.";
-				cout << endl;
-
-				last_perc_lcp = perc_lcp;
-				last_perc_da = perc_da;
-
-			}
-
-		}
-	}
-
-	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
-	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
-
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
-
-	cout << "Phase 3/4: computing LCP minima." << endl;
-
-	LCP_minima = vector<bool>(n,false);
-
-	auto TMP_NODES = vector<pair<sa_node, sa_node> >(4);
-
-	uint64_t nodes = 0;//visited ST nodes
-	max_stack = 0;
-
-	stack<pair<sa_node, sa_node> > S;
-	S.push({bwt1.root(), bwt2.root()});
-
-	int last_perc_lcp = -1;
-	int perc_lcp = 0;
-	int last_perc_da = -1;
-	int perc_da = 0;
-	uint64_t n_min = 0;//number of LCP minima
-
-	while(not S.empty()){
-
-		max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-		pair<sa_node, sa_node> N = S.top();
-		S.pop();
-		nodes++;
-
-		sa_node N1 = N.first;
-		sa_node N2 = N.second;
-		sa_node merged = merge_nodes(N1, N2);
-
-		//find leaves in the children of N1 and N2 that were
-		//skipped in the first pass, and update DA accordingly
-		find_leaves(N1, N2, da_values);
-
-		//compute LCP values at the borders of merged's children
-		update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right);
-		//update_lcp_threshold(merged, LCP_threshold, lcp_values, K, k_right, LCP);
-
-		update_lcp_minima(merged, n_min);
-
-		//follow Weiner links
-		int t = 0;
-		next_nodes(bwt1, bwt2, N1, N2, TMP_NODES, t);
-		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
-
-		perc_lcp = (100*lcp_values)/n;
-		perc_da = (100*da_values)/n;
-
-		if(perc_da > last_perc_da){
-
-			cout << "DA: " << perc_da << "%. ";
-			cout << "LCP: " << perc_lcp << "%.";
-			cout << endl;
-
-			last_perc_lcp = perc_lcp;
-			last_perc_da = perc_da;
-
-		}
-
-	}
-
-	cout << "Computed " << da_values << "/" << n << " DA values." << endl;
-	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
-	cout << "Found " << n_min << " LCP minima." << endl;
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+	navigate_two_bwts();
 
 	/*cout << "start checking LCP minima " << endl;
 	for(uint64_t i = 1; i<n-1;++i){
@@ -1240,6 +1387,10 @@ void run_two_datasets(){
 
 	uint64_t MAX_CLUST_LEN = 200;
 	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
+
+	uint64_t n1 = bwt1.size();
+	uint64_t n2 = bwt2.size();
+	uint64_t n = n1+n2;
 
 	for(uint64_t i=0;i<n;++i){
 
@@ -1319,125 +1470,9 @@ void run_two_datasets(){
  */
 void run_two_datasets_da(){
 
-	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
+	navigate_one_bwt();
 
-	dna_bwt_t bwt = dna_bwt_t(input1,TERM);
-
-	cout << "done." << endl;
-
-	uint64_t n = bwt.size();
-
-	cout << "\nPhase 2/4: navigating suffix tree leaves." << endl;
-
-	/*
-	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
-	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
-	 */
-	LCP_threshold = vector<bool>(2*n,false);
-
-	uint64_t leaves = 0;//number of visited leaves
-	uint64_t max_stack = 0;
-	uint64_t lcp_values = 1;//number of computed LCP values
-
-	{
-
-		auto TMP_LEAVES = vector<sa_leaf>(4);
-
-		stack<sa_leaf> S;
-		S.push(bwt.first_leaf());
-
-		int last_perc_lcp = -1;
-		int perc_lcp = 0;
-
-		while(not S.empty()){
-
-			sa_leaf L = S.top();
-			S.pop();
-			leaves++;
-
-			assert(leaf_size(L)>0);
-			max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-			update_LCP_leaf(L,lcp_values);
-
-			int t = 0;//number of children leaves
-			bwt.next_leaves(L, TMP_LEAVES, t, 2);
-
-			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
-
-			perc_lcp = (100*lcp_values)/n;
-
-			if(perc_lcp > last_perc_lcp){
-
-				cout << "LCP: " << perc_lcp << "%.";
-				cout << endl;
-
-				last_perc_lcp = perc_lcp;
-
-			}
-
-		}
-	}
-
-	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
-
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
-
-	cout << "Phase 3/4: computing LCP minima." << endl;
-
-	LCP_minima = vector<bool>(n,false);
-
-	auto TMP_NODES = vector<sa_node>(4);
-
-	uint64_t nodes = 0;//visited ST nodes
-	max_stack = 0;
-
-	stack<sa_node> S;
-	S.push(bwt.root());
-
-	int last_perc_lcp = -1;
-	int perc_lcp = 0;
-	uint64_t n_min = 0;//number of LCP minima
-
-	while(not S.empty()){
-
-		max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-		sa_node N = S.top();
-		S.pop();
-		nodes++;
-
-		//compute LCP values at the borders of N's children
-		update_lcp_threshold(N, LCP_threshold, lcp_values, K, k_right);
-
-		update_lcp_minima(N, n_min);
-
-		//follow Weiner links
-		int t = 0;
-		bwt.next_nodes(N, TMP_NODES, t);
-
-		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
-
-		perc_lcp = (100*lcp_values)/n;
-
-		if(perc_lcp > last_perc_lcp){
-
-			cout << "LCP: " << perc_lcp << "%.";
-			cout << endl;
-
-			last_perc_lcp = perc_lcp;
-
-		}
-
-	}
-
-	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
-	cout << "Found " << n_min << " LCP minima." << endl;
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
-
-	cout << "Phase 3/4: detecting SNPs and indels." << endl;
+	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
 	cout << "Output events will be stored in " << output << endl;
 	ofstream out_file = ofstream(output);
@@ -1455,7 +1490,9 @@ void run_two_datasets_da(){
 
 	uint64_t MAX_CLUST_LEN = 200;
 
-	vector<bool> DA(n,false);
+	uint64_t n = bwt1.size();
+
+	DA = vector<bool>(n,false);
 
 	ifstream da_file(input_da);
 	char x;
@@ -1497,7 +1534,7 @@ void run_two_datasets_da(){
 				if(clust_len>=2*mcov_out){
 
 					n_clusters++;
-					vector<variant_t> var = find_variants(bwt, DA, {begin,i});//CLUSTER: two datasets (one BWT and DA)
+					vector<variant_t> var = find_variants(bwt1, DA, {begin,i});//CLUSTER: two datasets (one BWT and DA)
 					to_file(var,out_file);
 
 				}
@@ -1546,123 +1583,7 @@ void run_two_datasets_da(){
  */
 void run_one_dataset(){
 
-	cout << "Phase 1/4: loading and indexing eBWT ... " << flush;
-
-	dna_bwt_t bwt = dna_bwt_t(input1,TERM);
-
-	cout << "done." << endl;
-
-	uint64_t n = bwt.size();
-
-	cout << "\nPhase 2/4: navigating suffix tree leaves." << endl;
-
-	/*
-	 * LCP_threshold[2*i] == 1 iff LCP[i] >= K
-	 * LCP_threshold[2*i+1] == 1 iff LCP[i] >= k_right
-	 */
-	LCP_threshold = vector<bool>(2*n,false);
-
-	uint64_t leaves = 0;//number of visited leaves
-	uint64_t max_stack = 0;
-	uint64_t lcp_values = 1;//number of computed LCP values
-
-	{
-
-		auto TMP_LEAVES = vector<sa_leaf>(4);
-
-		stack<sa_leaf> S;
-		S.push(bwt.first_leaf());
-
-		int last_perc_lcp = -1;
-		int perc_lcp = 0;
-
-		while(not S.empty()){
-
-			sa_leaf L = S.top();
-			S.pop();
-			leaves++;
-
-			assert(leaf_size(L)>0);
-			max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-			update_LCP_leaf(L,lcp_values);
-
-			int t = 0;//number of children leaves
-			bwt.next_leaves(L, TMP_LEAVES, t, 2);
-
-			for(int i=t-1;i>=0;--i) S.push(TMP_LEAVES[i]);
-
-			perc_lcp = (100*lcp_values)/n;
-
-			if(perc_lcp > last_perc_lcp){
-
-				cout << "LCP: " << perc_lcp << "%.";
-				cout << endl;
-
-				last_perc_lcp = perc_lcp;
-
-			}
-
-		}
-	}
-
-	cout << "Computed " << lcp_values << "/" << n << " LCP threshold values." << endl;
-
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << leaves << " suffix-tree leaves." << endl << endl;
-
-	cout << "Phase 3/4: computing LCP minima." << endl;
-
-	LCP_minima = vector<bool>(n,false);
-
-	auto TMP_NODES = vector<sa_node>(4);
-
-	uint64_t nodes = 0;//visited ST nodes
-	max_stack = 0;
-
-	stack<sa_node> S;
-	S.push(bwt.root());
-
-	int last_perc_lcp = -1;
-	int perc_lcp = 0;
-	uint64_t n_min = 0;//number of LCP minima
-
-	while(not S.empty()){
-
-		max_stack = S.size() > max_stack ? S.size() : max_stack;
-
-		sa_node N = S.top();
-		S.pop();
-		nodes++;
-
-		//compute LCP values at the borders of N's children
-		update_lcp_threshold(N, LCP_threshold, lcp_values, K, k_right);
-
-		update_lcp_minima(N, n_min);
-
-		//follow Weiner links
-		int t = 0;
-		bwt.next_nodes(N, TMP_NODES, t);
-
-		for(int i=t-1;i>=0;--i) S.push(TMP_NODES[i]);
-
-		perc_lcp = (100*lcp_values)/n;
-
-		if(perc_lcp > last_perc_lcp){
-
-			cout << "LCP: " << perc_lcp << "%.";
-			cout << endl;
-
-			last_perc_lcp = perc_lcp;
-
-		}
-
-	}
-
-	cout << "Computed " << lcp_values << "/" << n << " LCP values." << endl;
-	cout << "Found " << n_min << " LCP minima." << endl;
-	cout << "Max stack depth = " << max_stack << endl;
-	cout << "Processed " << nodes << " suffix-tree nodes." << endl << endl;
+	navigate_one_bwt();
 
 	cout << "Phase 4/4: detecting SNPs and indels." << endl;
 
@@ -1682,6 +1603,8 @@ void run_one_dataset(){
 
 	uint64_t MAX_CLUST_LEN = 200;
 	auto CLUST_SIZES = vector<uint64_t>(MAX_CLUST_LEN+1,0);
+
+	uint64_t n = bwt1.size();
 
 	for(uint64_t i=0;i<n;++i){
 
@@ -1706,7 +1629,7 @@ void run_one_dataset(){
 				if(clust_len>=2*mcov_out){
 
 					n_clusters++;
-					vector<variant_single_t> var = find_variants(bwt, {begin,i});//CLUSTER: one dataset (one BWT)
+					vector<variant_single_t> var = find_variants(bwt1, {begin,i});//CLUSTER: one dataset (one BWT)
 					to_file(var,out_file);
 
 				}
