@@ -57,6 +57,9 @@ Finally, If also a ground-truth VCF file is available, one can validate the abov
 
 A pre-print version can be found here: https://arxiv.org/abs/1805.01876. 
 
+### Funding
+
+Supported by the project Italian MIUR-SIR CMACBioSeq ("Combinatorial methods for analysis and compression of biological sequences") grant n.~RBSI146R5L, PI: Giovanna Rosone
 
 ### Install
 
