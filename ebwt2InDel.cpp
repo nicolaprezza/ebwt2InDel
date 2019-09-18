@@ -75,7 +75,7 @@ int max_variants_per_position = 0;
 
 void help(){
 
-	cout << "ebwt2snp [options]" << endl <<
+	cout << "ebwt2InDel [options]" << endl <<
 	"Options:" << endl <<
 	"-h          Print this help." << endl <<
 	"-1 <arg>    Input eBWT file (A,C,G,T,#) of first reads set (REQUIRED)." << endl <<
@@ -95,7 +95,7 @@ void help(){
 	"-q          Maximum number of allowed variants per genomic position in each sample. If 0, there is no limit. Default: 0."  <<  endl <<
 	"-t <arg>    ASCII value of terminator character. Default: " << int('#') << " (#)." << endl << endl <<
 
-	"\nTo run ebwt2snp, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
+	"\nTo run ebwt2InDel, you must first build the extended Burrows-Wheeler Transform of the input sequences." << endl << endl <<
 
 	"Output format: A fasta file with DNA fragments containing the variations." << endl;
 
@@ -1764,7 +1764,7 @@ int main(int argc, char** argv){
 
 	}
 
-	cout << "This is ebwt2snp, version 2." << endl;
+	cout << "This is ebwt2InDel." << endl;
 
 	if(input2.length()>0){
 

@@ -3,7 +3,7 @@
 // by a MIT license that can be found in the LICENSE file.
 
 /*
- * First: obtain the KissReads2 file (.snp) with ebwt2snp. Convert it to fastq with seqtk:
+ * First: obtain the KissReads2 file (.snp) with ebwt2InDel. Convert it to fastq with seqtk:
  *
  * seqtk seq -F 'h' input.snp > output.fastq
  *

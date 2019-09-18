@@ -1,10 +1,10 @@
-# ebwt2snp - version 2
+# ebwt2InDel
 
 ### Overview
 
-New version of ebwt2snp. This version works directly on the input BWT and does not require building the LCP and GSA arrays. This is about 8 times more space-efficient (but slightly slower) than version 1. 
+ebwt2InDel is the new version of ebwt2snp (https://github.com/nicolaprezza/ebwt2snp). The new version detect also InDels and works directly on the input BWT, without building the LCP and GSA arrays. This is about 8 times more space-efficient (but slightly slower) than version 1. 
 
-The **ebwt2snp** suite can be used to discover SNPs/indels inside one or between two sets of reads (fasta/fastq) *without* aligning them to  a reference genome (alignment-free, **reference-free**) by just analyzing the Burrows-Wheeler Transform of the dataset. The output is a fasta file (in KisSNP2 format) where sequences are the contexts surrounding the identified SNPs/indels. The suite finds its main use in applications where no reference genome is known (alignment-free, reference-free variation discovery), but could also lead to the discovery of variations not detected by standard alignment-based tools (which suffer from issues such as low-quality reference, alignment-dependent biases, and difficulty of aligning fragments containing gaps or inversions). Examples of use include:
+The **ebwt2InDel** suite can be used to discover SNPs/indels inside one or between two sets of reads (fasta/fastq) *without* aligning them to  a reference genome (alignment-free, **reference-free**) by just analyzing the Burrows-Wheeler Transform of the dataset. The output is a fasta file (in KisSNP2 format) where sequences are the contexts surrounding the identified SNPs/indels. The suite finds its main use in applications where no reference genome is known (alignment-free, reference-free variation discovery), but could also lead to the discovery of variations not detected by standard alignment-based tools (which suffer from issues such as low-quality reference, alignment-dependent biases, and difficulty of aligning fragments containing gaps or inversions). Examples of use include:
 
 - **Genotyping**: given a read set of an individual, find Heterozygous sites.
 - **Metagenomics**: given a read set containing DNA sequenced from many individuals (possibly of unknown species and unknown number), find differences between their genomes. For example, when run on a bacteria sample, the tool can be used to isolate fragments covering antibiotic-resistent genes (since not all bacteria will be resistent, this event will appear as a SNP/INDEL and will be detected by the tool).
@@ -13,21 +13,21 @@ The **ebwt2snp** suite can be used to discover SNPs/indels inside one or between
 
 ### Modes
 
-**ebwt2snp** supports three modes:
+**ebwt2InDel** supports three modes:
 
 1. Analyze one dataset. This mode finds SNPs/INDELs within a single read collection (e.g. genotyping, metagenomics, or rare-variant discovery). 
 ~~~~
-ebwt2snp -1 collection.ebwt -o output.snp
+ebwt2InDel -1 collection.ebwt -o output.snp
 ~~~~
  
 2. Analyze two datasets. This mode finds SNPs/INDELs between two read collections. The difference with the previous mode is that differences within the same dataset are not reported. 
 ~~~~
-ebwt2snp -1 collection1.ebwt -2 collection2.ebwt -o output.snp
+ebwt2InDel -1 collection1.ebwt -2 collection2.ebwt -o output.snp
 ~~~~
 
 3. Analyze two datasets merged in a single BWT. This mode operates as the previous one, but the input is provided differently: one BWT of the two merged collections, plus the binary Document Array telling which suffix belongs to which collection. This is twice as fast as the previous mode, because only one BWT is navigated (thus the number of cache misses is halved). The document array is a simple ASCII file filled with "0" and "1".
 ~~~~
-ebwt2snp -1 merged_collection.ebwt -d DA.txt -o output.snp
+ebwt2InDel -1 merged_collection.ebwt -d DA.txt -o output.snp
 ~~~~
 
 
@@ -35,9 +35,9 @@ ebwt2snp -1 merged_collection.ebwt -d DA.txt -o output.snp
 
 **IMPORTANT**: the DNA fragments of the input read set must contain only symbols 'A', 'C', 'G', 'T'. It is suggested either to filter out reads containing unknown characters 'N', or to remove them, or to replace them with random nucleotides.
 
-First, the BWT of the input dataset(s) must be built. To achieve this, you can use https://github.com/felipelouza/egsa, https://github.com/giovannarosone/BCR_LCP_GSA, or https://github.com/felipelouza/egap. Then, **ebwt2snp** can be fed with the computed BWT(s) using one of the three modes above described. 
+First, the BWT of the input dataset(s) must be built. To achieve this, you can use https://github.com/felipelouza/egsa, https://github.com/giovannarosone/BCR_LCP_GSA, or https://github.com/felipelouza/egap. Then, **ebwt2InDel** can be fed with the computed BWT(s) using one of the three modes above described. 
 
-Upon termination of **ebwt2snp**,  the tool **filter_snp** can be used to filter the .snp file generated by ebwt2snp so to keep only SNP/indels covered by at least m reads. Increasing m improves precision (but decreases sensitivity), and it is suggested when the input dataset is high-covered (e.g. a value m = 5 is suggested for coverages >= 25x).
+Upon termination of **ebwt2InDel**,  the tool **filter_snp** can be used to filter the .snp file generated by ebwt2InDel so to keep only SNP/indels covered by at least m reads. Increasing m improves precision (but decreases sensitivity), and it is suggested when the input dataset is high-covered (e.g. a value m = 5 is suggested for coverages >= 25x).
 
 If a reference is available, a VCF file can be generated from the output calls with the following pipeline:
 
@@ -64,13 +64,13 @@ Supported by the project Italian MIUR-SIR CMACBioSeq ("Combinatorial methods for
 ### Install
 
 ~~~~
-#download ebwt2snp, eGap, and BCR
-git clone https://github.com/nicolaprezza/ebwt2snp-v2
+#download ebwt2InDel, eGap, and BCR
+git clone https://github.com/nicolaprezza/ebwt2InDel
 git clone https://github.com/felipelouza/egap
 git clone https://github.com/giovannarosone/BCR\_LCP\_GSA
 
-#build ebwt2snp
-cd ebwt2snp-v2
+#build ebwt2InDel
+cd ebwt2InDel
 mkdir build
 cd build
 cmake ..
@@ -83,7 +83,7 @@ make
 
 ### Run - one sample
 
-Enter the folder with the fasta file _reads.fasta_ . We assume that executables 'eGap', 'ebwt2snp' are global. 
+Enter the folder with the fasta file _reads.fasta_ . We assume that executables 'eGap', 'ebwt2InDel' are global. 
 
 ~~~~
 #Step 1: remove reads containing 'N', or replace 'N' with random nucleotides
@@ -93,7 +93,7 @@ Enter the folder with the fasta file _reads.fasta_ . We assume that executables 
 eGap reads.fasta
 
 #Call SNPs (do this in the same folder containing all other files)
-ebwt2snp -1 reads.fasta.bwt -o output.snp -t 0
+ebwt2InDel -1 reads.fasta.bwt -o output.snp -t 0
 
 #File output.snp.fasta now contains identified SNPs/indels.
 
@@ -105,7 +105,7 @@ filter_snp output.snp 5 > output.5.snp
 
 ### Run - two samples
 
-Enter the folder with the two fasta files _reads1.fasta_  and _reads2.fasta_ (i.e. the reads of the two samples). We assume that executables 'eGap', 'ebwt2snp' are global. 
+Enter the folder with the two fasta files _reads1.fasta_  and _reads2.fasta_ (i.e. the reads of the two samples). We assume that executables 'eGap', 'ebwt2InDel' are global. 
 
 ~~~~
 #Step 1: remove reads containing 'N', or replace 'N' with random nucleotides
@@ -116,7 +116,7 @@ eGap reads1.fasta
 eGap reads2.fasta
 
 #Call SNPs (do this in the same folder containing all other files)
-ebwt2snp -1 reads1.fasta.bwt -2 reads1.fasta.bwt -o output.snp -t 0
+ebwt2InDel -1 reads1.fasta.bwt -2 reads1.fasta.bwt -o output.snp -t 0
 
 
 #Filter only events supported by at least 5 reads
