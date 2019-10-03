@@ -102,6 +102,28 @@ filter_snp output.snp 5 > output.5.snp
 
 ~~~~
 
+### One sample - parallel mode (experimental)
+
+One sample can also be analyzed using multithreading. The idea is to sort the input fasta file by context (using HARC). After that, the sorted fasta can be broken into pieces, each of which can be analyzed separately.
+
+We provide a script, **pebwt2InDel**, that executes automatically the parallel pipeline. 
+
+**Required pre-installed software:**: 
+HARC (https://github.com/shubhamchandak94/HARC)
+BCR_LCP_GSA (https://github.com/giovannarosone/BCR_LCP_GSA)
+
+**Usage**
+~~~~
+pebwt2InDel.sh input_fasta threads RAM read_len output_directory/ harc_folder/ 
+~~~~
+
+**NOTES**: 
+- use absolute paths ending with /
+- "read_len" must be shorter than or equal to the length of most reads; remainders are lost!
+- RAM is the RAM used by BCR (in MB)
+- RAM: around n bytes, where n is the total number of nucleotides.
+- Disk usage: in addition to the input and output (snp file), the process uses 4n additional Bytes.
+
 
 ### Run - two samples
 
