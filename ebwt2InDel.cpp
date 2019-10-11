@@ -26,7 +26,7 @@ int k_right = 0;//extract k_right nucleotides from right of suffix array range, 
 int max_snvs_def = 2;//maximum number of SNVs allowed in left contexts (excluded main SNV).
 int max_snvs = 0;//maximum number of SNVs allowed in left contexts
 
-int mcov_out_def = 6;//minimum cluster length / coverage of output events
+int mcov_out_def = 3;//minimum cluster length / coverage of output events
 int mcov_out = 0;
 
 //max indel length. If 0, indels are disabled.
