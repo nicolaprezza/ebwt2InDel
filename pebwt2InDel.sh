@@ -92,7 +92,7 @@ DIFF=$(echo "$END - $START" | bc)
 for t in $(seq 0 $N); do  
 
  if [[ "$t" -le 9 ]]; then t=0$t; fi
- rm -rf ${output_directory}BCRx$i
+ rm -rf ${output_directory}BCRx$t
 
 done;
 
