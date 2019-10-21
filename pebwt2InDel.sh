@@ -89,6 +89,16 @@ cat ${output_directory}BCRx*/out.snp > ${output_directory}/variants.snp
 END=$(date +%s.%N)
 DIFF=$(echo "$END - $START" | bc)
 
+for t in $(seq 0 $N); do  
+
+ if [[ "$t" -le 9 ]]; then t=0$t; fi
+ rm -rf ${output_directory}BCRx$i
+
+done;
+
+rm -rf ${output_directory}input*
+rm -rf ${output_directory}harc*
+
 echo "Done. Time (seconds): "$DIFF
 
 
