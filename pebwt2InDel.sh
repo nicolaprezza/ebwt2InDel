@@ -81,13 +81,11 @@ echo "running BCR_LCP_GSA "${output_directory}BCRx$i/in.fa ${output_directory}BC
 N=$((N-1))
 
 for t in $(seq 0 $N); do foo $t & done; wait
+#for t in $(seq 0 $N); do foo $t done; #uncomment this and comment above line to run sequentially (memory-efficient)
 
 echo "Concatenating outputs."
 
 cat ${output_directory}BCRx*/out.snp > ${output_directory}/variants.snp
-
-END=$(date +%s.%N)
-DIFF=$(echo "$END - $START" | bc)
 
 for t in $(seq 0 $N); do  
 
@@ -96,8 +94,10 @@ for t in $(seq 0 $N); do
 
 done;
 
+END=$(date +%s.%N)
+DIFF=$(echo "$END - $START" | bc)
+
 rm -rf ${output_directory}input*
-rm -rf ${output_directory}harc*
 
 echo "Done. Time (seconds): "$DIFF
 
