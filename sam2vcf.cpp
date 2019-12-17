@@ -220,7 +220,7 @@ int main(int argc, char** argv){
 	string str;
 	out << "#CHROM\tPOS\tID\tREF\tALT\tTYPE" << endl;
 
-	int ID = 1; //event ID
+	string ID = "*"; //event ID
 
 	while(getline(isam, str)){
 
@@ -296,7 +296,7 @@ int main(int argc, char** argv){
 
 						if(ref[chr][pos_int + j - 1] != seq[k]){
 
-							out << chr << "\t" << (pos_int + j) << "\t" << (ID++) << "\t" << ref[chr][pos_int + j - 1] << "\t" << seq[k] << "\tSNP" << endl;
+							out << chr << "\t" << (pos_int + j) << "\t" << ID << "\t" << ref[chr][pos_int + j - 1] << "\t" << seq[k] << "\tSNP" << endl;
 
 						}
 
@@ -316,13 +316,13 @@ int main(int argc, char** argv){
 
 							k += DI;
 
-							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
 
 						}else if (type == 'D'){//deletion in reference
 
 							string REF = ref[chr].substr(pos_int + M1 - 2,DI+1);
 							string ALT = seq.substr(k-1,1);
-							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << (ID++) << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
 
 						}
 
@@ -336,7 +336,7 @@ int main(int argc, char** argv){
 
 							if(ref[chr][start+j] != seq[k]){
 
-								out << chr << "\t" << (start + j +1) << "\t" << (ID++) << "\t" << ref[chr][start+j] << "\t" << seq[k] << "\tSNP" << endl;
+								out << chr << "\t" << (start + j +1) << "\t" << ID << "\t" << ref[chr][start+j] << "\t" << seq[k] << "\tSNP" << endl;
 
 							}
 
