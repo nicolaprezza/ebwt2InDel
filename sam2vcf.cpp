@@ -38,6 +38,8 @@ int tot_events=0;
 int used_events=0;
 int good_events=0;
 
+string SAMPLE = "SAMPLE";
+
 void help(){
 
 	cout << "sam2vcf [OPTIONS]" << endl << endl <<
@@ -47,7 +49,8 @@ void help(){
 		"-f <arg>    Reference fasta file. REQUIRED." << endl <<
 		"-s <arg>    Input SAM file. REQUIRED" << endl <<
 		"-v <arg>    Output vcf file. REQUIRED." << endl <<
-		"-m <arg>    Maximum number of differences, i.e. mismatches + indels (default:5)" << endl;
+		"-m <arg>    Maximum number of differences, i.e. mismatches + indels (default:5)" << endl <<
+		"-S <arg>    Sample name (default:\"SAMPLE\")" << endl;
 	exit(0);
 }
 
@@ -128,7 +131,7 @@ int main(int argc, char** argv){
 	int max_mism = 5;
 
 	int opt;
-	while ((opt = getopt(argc, argv, "hs:f:v:m:")) != -1){
+	while ((opt = getopt(argc, argv, "hs:f:v:m:S:")) != -1){
 		switch (opt){
 			case 'h':
 				help();
@@ -150,6 +153,9 @@ int main(int argc, char** argv){
 			break;
 			case 'v':
 				output = string(optarg);
+			break;
+			case 'S':
+				SAMPLE = string(optarg);
 			break;
 			case 'm':
 				max_mism = atoi(optarg);
@@ -218,9 +224,42 @@ int main(int argc, char** argv){
 	ifasta.close();
 
 	string str;
-	out << "#CHROM\tPOS\tID\tREF\tALT\tTYPE" << endl;
 
-	string ID = "*"; //event ID
+
+
+
+
+/*
+ * VCF format used
+ *
+
+##fileformat=VCFv4.1
+##contig=<ID=1>
+##FILTER=<ID=PASS,Description="All filters passed">
+##INFO=<ID=VT,Number=1,Type=String,Description="Variant type">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG00096
+1	10177	rs367896724	A	AC	100	PASS	VT=INDEL	GT	1|0
+1	10352	rs555500075	T	TA	100	PASS	VT=INDEL	GT	1|0
+1	10616	rs376342519	CCGCCGTTGCAAAGGCGCGCCG	C	100	PASS	VT=INDEL	GT	1|0
+
+*/
+
+
+	out << "##fileformat=VCFv4.1" << endl;
+
+	for(string c : contigs){
+
+		out << "##contig=<ID=" << c << ">" << endl;
+
+	}
+
+	out << "##FILTER=<ID=PASS,Description=\"All filters passed\">" << endl;
+	out << "##INFO=<ID=VT,Number=1,Type=String,Description=\"Variant type\">" << endl;
+	out << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << endl;
+	out << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" << SAMPLE << endl;
+
+	string ID = "."; //event ID: empty
 
 	while(getline(isam, str)){
 
@@ -296,7 +335,16 @@ int main(int argc, char** argv){
 
 						if(ref[chr][pos_int + j - 1] != seq[k]){
 
-							out << chr << "\t" << (pos_int + j) << "\t" << ID << "\t" << ref[chr][pos_int + j - 1] << "\t" << seq[k] << "\tSNP" << endl;
+							out << 	chr << "\t" << //CHROM
+									(pos_int + j) << "\t" << //POS
+									ID << "\t" << //ID
+									ref[chr][pos_int + j - 1] << "\t" << //REF
+									seq[k] << "\t" << //ALT
+									"100\t" << //QUAL
+									"PASS\t" << //FILTER
+									"VT=SNP\t" << //INFO
+									"GT\t" << //FORMAT
+									"1|1" << endl; //SAMPLE
 
 						}
 
@@ -316,13 +364,36 @@ int main(int argc, char** argv){
 
 							k += DI;
 
-							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+							//out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+
+							out << 	chr << "\t" << //CHROM
+									(pos_int + (M1-1)) << "\t" << //POS
+									ID << "\t" << //ID
+									REF << "\t" << //REF
+									ALT << "\t" << //ALT
+									"100\t" << //QUAL
+									"PASS\t" << //FILTER
+									"VT=INDEL\t" << //INFO
+									"GT\t" << //FORMAT
+									"1|1" << endl; //SAMPLE
 
 						}else if (type == 'D'){//deletion in reference
 
 							string REF = ref[chr].substr(pos_int + M1 - 2,DI+1);
 							string ALT = seq.substr(k-1,1);
-							out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+
+							//out << chr << "\t" << (pos_int + (M1-1)) << "\t" << ID << "\t" << REF << "\t" << ALT << "\tINDEL" << endl;
+
+							out << 	chr << "\t" << //CHROM
+									(pos_int + (M1-1)) << "\t" << //POS
+									ID << "\t" << //ID
+									REF << "\t" << //REF
+									ALT << "\t" << //ALT
+									"100\t" << //QUAL
+									"PASS\t" << //FILTER
+									"VT=INDEL\t" << //INFO
+									"GT\t" << //FORMAT
+									"1|1" << endl; //SAMPLE
 
 						}
 
@@ -336,7 +407,18 @@ int main(int argc, char** argv){
 
 							if(ref[chr][start+j] != seq[k]){
 
-								out << chr << "\t" << (start + j +1) << "\t" << ID << "\t" << ref[chr][start+j] << "\t" << seq[k] << "\tSNP" << endl;
+								//out << chr << "\t" << (start + j +1) << "\t" << ID << "\t" << ref[chr][start+j] << "\t" << seq[k] << "\tSNP" << endl;
+
+								out << 	chr << "\t" << //CHROM
+										(start + j +1) << "\t" << //POS
+										ID << "\t" << //ID
+										ref[chr][start+j] << "\t" << //REF
+										seq[k] << "\t" << //ALT
+										"100\t" << //QUAL
+										"PASS\t" << //FILTER
+										"VT=SNP\t" << //INFO
+										"GT\t" << //FORMAT
+										"1|1" << endl; //SAMPLE
 
 							}
 
