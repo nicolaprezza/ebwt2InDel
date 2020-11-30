@@ -52,8 +52,9 @@ Finally, If also a ground-truth VCF file is available, one can validate the abov
 
 ### Publications
 
-- *Nicola Prezza, Nadia Pisanti, Marinella Sciortino and Giovanna Rosone: Detecting mutations by eBWT. WABI 2018. Leibniz International Proceedings in Informatics, LIPIcs , 2018, 113, art. no. 3, Schloss Dagstuhl--Leibniz-Zentrum für Informatik.*
-- Nicola Prezza, Nadia Pisanti, Marinella Sciortino, and Giovanna Rosone, 2019. SNPs detection by eBWT positional clustering. Algorithms for Molecular Biology, 14(1), p.3.*
+- *Nicola Prezza, Nadia Pisanti, Marinella Sciortino and Giovanna Rosone: Detecting mutations by eBWT. WABI 2018. Leibniz International Proceedings in Informatics, LIPIcs , 2018, 113, art. no. 3, Schloss Dagstuhl--Leibniz-Zentrum für Informatik.
+- Nicola Prezza, Nadia Pisanti, Marinella Sciortino, and Giovanna Rosone, 2019. SNPs detection by eBWT positional clustering. Algorithms for Molecular Biology, 14(1), p.3.
+- Nicola Prezza, Nadia Pisanti, Marinella Sciortino, Giovanna Rosone: Variable-order reference-free variant discovery with the Burrows-Wheeler Transform. BMC Bioinform (2020), 21-S(8): 260, 10.1186/s12859-020-03586-3.*
 
 A pre-print version can be found here: https://arxiv.org/abs/1805.01876. 
 
